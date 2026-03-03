@@ -517,18 +517,21 @@ PUBLIC_POLL_INTERVAL_SLOW=30000
 
 ## 15. Urutan Implementasi (Fase)
 
-### Phase 1 — Foundation
-- [ ] Install packages (shadcn-svelte, echarts, lucide-svelte, date-fns)
-- [ ] Update `app.css` — enterprise light, `@theme` tokens, Inter + JetBrains Mono
-- [ ] `packages/env/src/web.ts` — definisikan semua env vars
-- [ ] `$lib/utils/auth.ts` — localStorage token helpers
-- [ ] `$lib/utils/format.ts` — currency (Rp), date, duration
-- [ ] `$lib/utils/plate.ts` — uppercase + trim
-- [ ] `$lib/utils/role.ts` — ROUTE_ROLES + hasRole()
-- [ ] `$lib/utils/polling.ts` — createPoller
-- [ ] `$lib/api/client.ts` — apiFetch
-- [ ] `$lib/api/*.ts` — semua typed API functions
-- [ ] `$lib/types/api.d.ts` + `domain.d.ts`
+### Phase 1 — Foundation ✅
+- [x] Install packages — `shadcn-svelte@1.1.1`, `echarts@6.0.0`, `lucide-svelte@0.576.0`, `date-fns@4.1.0`, `axios@1.13.6`
+- [x] `app.css` — shadcn slate base (oklch vars) + brand tokens `--color-brand-*` + Inter/JetBrains Mono via Google Fonts
+- [x] `packages/env/src/web.ts` — `PUBLIC_API_BASE_URL`, `PUBLIC_POLL_INTERVAL_FAST/NORMAL/SLOW`
+- [x] `$lib/utils/auth.ts` — `getToken`, `setToken`, `clearToken`, `getRole`, `getUserID` (decode JWT via `atob`, no library)
+- [x] `$lib/utils/format.ts` — `formatCurrency` (Intl.NumberFormat IDR), `formatDate`, `formatDateTime`, `formatTime`, `formatDurationMinutes`
+- [x] `$lib/utils/plate.ts` — `normalizePlate` (uppercase + strip whitespace)
+- [x] `$lib/utils/role.ts` — `ROUTE_ROLES`, `ROLE_REDIRECT`, `hasRole`
+- [x] `$lib/utils/polling.ts` — `createPoller` (start/stop wrapper)
+- [x] `$lib/api/client.ts` — axios instance + request interceptor (inject JWT) + response interceptor (401 → clear + redirect)
+- [x] `$lib/api/*.ts` — `auth`, `zones`, `gates`, `vehicles`, `rfid`, `fees`, `transactions`, `payments`, `overrides`, `audit`
+- [x] `$lib/types/api.d.ts` — `ApiResponse<T>`, `PaginatedResponse<T>`, `Pagination`
+- [x] `$lib/types/domain.d.ts` — semua domain types dari Go API DTOs
+
+> **Catatan:** shadcn `init` overwrite `app.css` — brand tokens di-restore manual dan di-merge setelah block shadcn.
 
 ### Phase 2 — Layout & Shell
 - [ ] `AppShell.svelte`
