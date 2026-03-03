@@ -541,16 +541,16 @@ import { PUBLIC_API_BASE_URL, PUBLIC_POLL_INTERVAL_FAST } from '$env/static/publ
 
 > **Catatan:** `getUserName()` disimpan ke localStorage saat login (bukan decode JWT) supaya TopBar tidak perlu fetch API. `clearToken()` juga clear user name sekaligus.
 
-### Phase 3 — Shared UI Components
-- [ ] `StatusBadge.svelte`
-- [ ] `PageHeader.svelte`
-- [ ] `StatCard.svelte`
-- [ ] `DataTable.svelte` — row selection, loading skeleton, empty state, default 20 rows
-- [ ] `Pagination.svelte` — numbered pages dengan ellipsis (1 2 3 ... 10)
-- [ ] `FilterBar.svelte`
-- [ ] `ConfirmModal.svelte`
-- [ ] `PlateDisplay.svelte`
-- [ ] ECharts wrappers: `LineChart.svelte`, `BarChart.svelte`, `HeatmapChart.svelte`
+### Phase 3 — Shared UI Components ✅
+- [x] `StatusBadge.svelte` — semua status dari Go API (transaction, payment, refund, OCR, device, gate)
+- [x] `PageHeader.svelte` — title + optional description + optional actions snippet
+- [x] `StatCard.svelte` — value + optional icon + optional trend (% hijau/merah) atau sub text
+- [x] `Pagination.svelte` — numbered pages dengan ellipsis, prev/next buttons
+- [x] `DataTable.svelte` — row selection, sortable columns, search inline, column visibility toggle, export CSV, loading skeleton, empty state, bulk select dengan checkbox (select all / indeterminate / per row), bulkActions snippet, highlight bg-blue-50 saat selected
+- [x] `FilterBar.svelte` — fields type text/select/date, reset button, optional actions snippet
+- [x] `ConfirmModal.svelte` — shadcn Dialog, variant default/danger, loading state
+- [x] `PlateDisplay.svelte` — font mono, auto-normalize, size sm/md/lg, mismatch highlight merah
+- [x] `charts/LineChart.svelte`, `charts/BarChart.svelte`, `charts/HeatmapChart.svelte` — echarts raw + ResizeObserver + loading state
 
 > **Keputusan desain yang sudah disepakati (dicatat di sini sebagai referensi Phase 4-5):**
 >
