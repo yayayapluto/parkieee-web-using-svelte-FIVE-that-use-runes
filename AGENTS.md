@@ -562,10 +562,22 @@ import { PUBLIC_API_BASE_URL, PUBLIC_POLL_INTERVAL_FAST } from '$env/static/publ
 >
 > **Pagination** — numbered pages dengan ellipsis, default page size 20 rows.
 
-### Phase 4 — Kiosk Journey
-- [ ] `/kiosk/zones`
-- [ ] `/kiosk/gate-in`
-- [ ] `/kiosk/gate-out`
+### Phase 4 — Kiosk Journey ✅
+- [x] `/kiosk/setup` — auth via gate_token (POST /gate/authenticate), simpan JWT + GateInfo ke localStorage, redirect ke /kiosk/[gate_id]
+- [x] `/kiosk/[gate_id]/+layout.svelte` — guard: cek gate token + validasi gate_id cocok dengan localStorage
+- [x] `/kiosk/[gate_id]/` — idle screen: clock, online indicator (Wifi/WifiOff), tombol sesuai gate_type
+- [x] `/kiosk/[gate_id]/entry` — pilih QR/RFID → input (RFID: hidden input HID emulation, QR: visible input) → POST /transactions/entry
+- [x] `/kiosk/[gate_id]/exit` — pilih QR/RFID → lookup by code → confirm screen (plat + durasi + estimasi tarif) → POST /transactions/:id/exit → redirect ke /payment
+- [x] `/kiosk/[gate_id]/payment` — pilih QRIS/Tunai; QRIS: poll payment status tiap 3 detik; Tunai: preset nominal + hitung kembalian → POST /payments/cash
+- [x] `/kiosk/[gate_id]/success` — countdown 7 detik lalu auto-redirect ke idle
+
+> **Catatan kiosk:**
+> - Semua icon WAJIB lucide-svelte — tidak ada emoji di UI
+> - Idle timeout 60 detik di entry/exit, 120 detik di payment — auto-redirect ke idle
+> - RFID reader pakai HID keyboard emulation → hidden input yang auto-focus, submit on Enter
+> - Gate auth sementara via gate_token; akan migrasi ke QR pairing + SSE (listenPairing SSE endpoint sudah ada di backend)
+> - `getGateToken()` / `setGateToken()` / `getGateInfo()` / `setGateInfo()` / `clearGateSession()` ada di `$lib/utils/auth.ts`
+> - Payment API: `payCash(txId, tendered)`, `initiateQRIS(txId)`, `getPaymentsByTransaction(txId)` harus ada di `$lib/api/payments.ts`
 
 ### Phase 5 — Operator Journey
 - [ ] `/operator/transactions`

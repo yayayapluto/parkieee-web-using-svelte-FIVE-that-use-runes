@@ -12,6 +12,11 @@ export async function initiateQRIS(transaction_id: string): Promise<Payment> {
   return res.data.data
 }
 
+export async function getPaymentsByTransaction(txId: string): Promise<Payment[]> {
+  const res = await apiClient.get<ApiResponse<Payment[]>>(`/api/v1/payments/transaction/${txId}`)
+  return res.data.data
+}
+
 export async function getPayment(id: string): Promise<Payment> {
   const res = await apiClient.get<ApiResponse<Payment>>(`/api/v1/payments/${id}`)
   return res.data.data
