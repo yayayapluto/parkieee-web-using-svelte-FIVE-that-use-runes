@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@Svelte-Web/config": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "^7.1.2"
   }
 }

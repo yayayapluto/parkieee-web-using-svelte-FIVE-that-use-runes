@@ -315,6 +315,8 @@ export function hasRole(required: string[], userRole: string | null): boolean {
 
 ## 9. API Client (`$lib/api/client.ts`)
 
+> **Penting:** Di SvelteKit, env vars TIDAK bisa diakses via `import.meta.env`. Gunakan `$env/static/public` untuk PUBLIC_* vars. `import.meta.env` akan return `undefined` dan axios akan fallback ke relative URL (localhost).
+
 ```ts
 import axios from 'axios'
 import { getToken, clearToken } from '$lib/utils/auth'
@@ -486,32 +488,21 @@ Pakai di `onMount` / `onDestroy`:
 
 ## 14. Environment Variables
 
-Didefinisikan di `packages/env/src/web.ts`:
-
-```ts
-import { createEnv } from '@t3-oss/env-core'
-import { z } from 'zod'
-
-export const env = createEnv({
-  clientPrefix: 'PUBLIC_',
-  client: {
-    PUBLIC_API_BASE_URL:         z.string().url(),
-    PUBLIC_POLL_INTERVAL_FAST:   z.coerce.number().default(5_000),
-    PUBLIC_POLL_INTERVAL_NORMAL: z.coerce.number().default(10_000),
-    PUBLIC_POLL_INTERVAL_SLOW:   z.coerce.number().default(30_000),
-  },
-  runtimeEnv: import.meta.env,
-  emptyStringAsUndefined: true,
-})
-```
-
-`apps/web/.env`:
+Didefinisikan di `apps/web/.env`:
 ```env
-PUBLIC_API_BASE_URL=http://localhost:8080
+PUBLIC_API_BASE_URL=https://api.yyypluto.my.id
 PUBLIC_POLL_INTERVAL_FAST=5000
 PUBLIC_POLL_INTERVAL_NORMAL=10000
 PUBLIC_POLL_INTERVAL_SLOW=30000
 ```
+
+Akses di app code **selalu** via SvelteKit's `$env/static/public` — JANGAN pakai `import.meta.env`:
+
+```ts
+import { PUBLIC_API_BASE_URL, PUBLIC_POLL_INTERVAL_FAST } from '$env/static/public'
+```
+
+`packages/env/src/web.ts` ada sebagai schema validation saja — tidak dipakai langsung di app code karena `import.meta.env` tidak bekerja di SvelteKit context.
 
 ---
 
@@ -532,25 +523,44 @@ PUBLIC_POLL_INTERVAL_SLOW=30000
 - [x] `$lib/types/domain.d.ts` — semua domain types dari Go API DTOs
 
 > **Catatan:** shadcn `init` overwrite `app.css` — brand tokens di-restore manual dan di-merge setelah block shadcn.
+> Google Fonts `@import url(...)` harus di baris pertama sebelum semua statement lain — PostCSS strict soal urutan `@import`.
 
-### Phase 2 — Layout & Shell
-- [ ] `AppShell.svelte`
-- [ ] `Sidebar.svelte`
-- [ ] `TopBar.svelte`
-- [ ] `KioskShell.svelte`
-- [ ] Login page (`/login`)
-- [ ] Root `+layout.server.ts` — session check
+### Phase 2 — Layout & Shell ✅
+- [x] Root `+layout.svelte` — import app.css, render children
+- [x] Root `+page.svelte` — redirect ke journey berdasarkan role (onMount)
+- [x] `AppShell.svelte` — sidebar + topbar + main content wrapper
+- [x] `Sidebar.svelte` — navy sidebar, nav items, active state via `$page.url.pathname`
+- [x] `TopBar.svelte` — nama user (localStorage) + role label + tombol Keluar
+- [x] `KioskShell.svelte` — fullscreen dark wrapper tanpa sidebar
+- [x] `/login/+page.svelte` — form email/password, Zod validation, redirect by role
+- [x] `operator/+layout.svelte` — guard `['operator','admin']` + nav Transaksi/Gerbang/Override
+- [x] `admin/+layout.svelte` — guard `['admin']` + nav Pengguna/Zona/Gerbang/RFID/Tarif/Izin
+- [x] `monitoring/+layout.svelte` — guard `['owner','admin']` + nav Dashboard/Pendapatan/Okupansi/Audit
+- [x] `engineer/+layout.svelte` — guard `['engineer','admin']` + nav Perangkat/OCR/RFID/Log
+- [x] `kiosk/+layout.svelte` — KioskShell, no guard
+
+> **Catatan:** `getUserName()` disimpan ke localStorage saat login (bukan decode JWT) supaya TopBar tidak perlu fetch API. `clearToken()` juga clear user name sekaligus.
 
 ### Phase 3 — Shared UI Components
 - [ ] `StatusBadge.svelte`
 - [ ] `PageHeader.svelte`
 - [ ] `StatCard.svelte`
-- [ ] `DataTable.svelte` — sortable, loading skeleton, empty state
+- [ ] `DataTable.svelte` — row selection, loading skeleton, empty state, default 20 rows
+- [ ] `Pagination.svelte` — numbered pages dengan ellipsis (1 2 3 ... 10)
 - [ ] `FilterBar.svelte`
-- [ ] `Pagination.svelte`
 - [ ] `ConfirmModal.svelte`
 - [ ] `PlateDisplay.svelte`
 - [ ] ECharts wrappers: `LineChart.svelte`, `BarChart.svelte`, `HeatmapChart.svelte`
+
+> **Keputusan desain yang sudah disepakati (dicatat di sini sebagai referensi Phase 4-5):**
+>
+> **Operator Transactions** — tiga panel: form kiri (fixed width) + foto S3 tengah (entry & exit photo dari transaksi yang dipilih) + tabel full width bawah. Foto real-time tidak perlu — cukup dari S3.
+>
+> **Gate per shift** — gate dipilih sekali saat start shift, disimpan di localStorage via `getActiveGate()` / `setActiveGate()` / `clearActiveGate()` di `$lib/utils/auth.ts`. `clearToken()` juga clear active gate. Kalau `getActiveGate()` null saat buka `/operator/transactions` → tampilkan prompt pilih gate dulu.
+>
+> **Kiosk** — split panel dua kolom: kiri info durasi + kategori, kanan plat nomor + nominal bayar. Mengikuti referensi sistem parkir existing di lapangan.
+>
+> **Pagination** — numbered pages dengan ellipsis, default page size 20 rows.
 
 ### Phase 4 — Kiosk Journey
 - [ ] `/kiosk/zones`

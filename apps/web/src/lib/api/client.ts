@@ -1,9 +1,10 @@
 import axios from 'axios'
 import { goto } from '$app/navigation'
 import { getToken, clearToken } from '$lib/utils/auth'
+import { PUBLIC_API_BASE_URL } from '$env/static/public'
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.PUBLIC_API_BASE_URL,
+  baseURL: PUBLIC_API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 })
 
