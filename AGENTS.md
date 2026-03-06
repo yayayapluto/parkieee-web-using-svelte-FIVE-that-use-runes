@@ -29,13 +29,58 @@ bukan multi-app monorepo. Struktur workspace:
 
 ```
 apps/
-  web/          ← SvelteKit app, semua kode frontend ada di sini
+  web/          ← SvelteKit app utama (operator/admin/monitoring/engineer dashboard)
+  kiosk/        ← SvelteKit app terpisah khusus kiosk gate (port 5174)
 packages/
   config/       ← shared tsconfig (tsconfig.base.json)
   env/          ← shared env validator (@t3-oss/env-core + zod)
 ```
 
-Semua kode yang gua tulis ada di `apps/web/src/`.
+Kode dashboard ada di `apps/web/src/`. Kode kiosk ada di `apps/kiosk/src/`.
+
+### apps/kiosk — App Terpisah
+
+`apps/kiosk` adalah SvelteKit app mandiri dengan stack sendiri:
+- Port: `5174` (via `vite dev --port 5174`)
+- Auth: gate token (bukan JWT user), disimpan di localStorage
+- Routing: `/setup`, `/gate/[gate_id]`, `/simulate`
+- QR scanner: jsQR via Web Worker blob (`$lib/workers/qr-scanner.worker.ts`)
+- Tunnel: `pnpm tunnel` = `cloudflared tunnel --url http://localhost:5174`
+- Vite config: `allowedHosts: 'all'`, `host: true` — wajib untuk cloudflared
+
+Struktur `apps/kiosk/src/`:
+```
+lib/
+  api/          # client.ts, transactions.ts, payments.ts, fees.ts, gates.ts, vehicles.ts
+  components/
+    EntryGate.svelte          # komponen gate masuk (QR scan + RFID + tiket modal)
+    ExitGate.svelte           # komponen gate keluar (QR/RFID + payment modal + camera preview)
+    kiosk/                    # sub-komponen: Header, SubHeader, StatusBar, Modal, dll
+    payment/                  # PaymentSelect, PaymentQRIS, PaymentCash, dll
+  types/        # api.d.ts, domain.d.ts (PaymentStatus: pending|completed|failed|expired|refunded)
+  utils/        # auth.ts (gate token helpers), format.ts, polling.ts
+  workers/
+    qr-scanner.worker.ts      # jsQR Web Worker untuk scan QR dari kamera
+routes/
+  +layout.svelte / +layout.ts  # ssr = false
+  +page.svelte                 # redirect ke /gate/[id] atau /setup
+  setup/                       # auth gate via gate_token
+  gate/[gate_id]/              # halaman utama gate (entry/exit auto-detect dari gate_type)
+  gate/[gate_id]/payment/      # payment page (post-exit)
+  gate/[gate_id]/success/      # success screen
+  simulate/                    # dev tool: backdate entry_at transaksi open
+```
+
+### Kiosk — Konvensi Penting
+
+- **PaymentStatus** di kiosk: `'completed'` (bukan `'paid'`) — sesuai Go API `pkg/types/payment.go`
+- **RFID**: global `document.addEventListener('keydown')` — tidak pakai hidden input, karena focus bisa hilang
+- **QR Camera**: `jsQR` via Web Worker blob, scan setiap 250ms, cooldown 3s setelah berhasil scan
+- **QRIS polling**: `GET /gate/payments/:id/poll` tiap 3s — hit Midtrans API langsung (bukan cuma cek DB)
+- **Camera debug preview**: tombol kamera pojok kanan bawah ExitGate — toggle preview overlay + scanline animation
+- **Simulate page** (`/simulate`): dropdown transaksi open, set durasi backdate, pakai `PATCH /gate/transactions/:id/simulate`
+- **Idle reset**: 60s di gate → `window.location.reload()`
+- RFID exit fallback: kalau transaksi `awaiting_payment` (kartu ditempel ulang), skip `recordExit`, langsung payment modal
 
 ---
 
@@ -562,22 +607,38 @@ import { PUBLIC_API_BASE_URL, PUBLIC_POLL_INTERVAL_FAST } from '$env/static/publ
 >
 > **Pagination** — numbered pages dengan ellipsis, default page size 20 rows.
 
-### Phase 4 — Kiosk Journey ✅
-- [x] `/kiosk/setup` — auth via gate_token (POST /gate/authenticate), simpan JWT + GateInfo ke localStorage, redirect ke /kiosk/[gate_id]
-- [x] `/kiosk/[gate_id]/+layout.svelte` — guard: cek gate token + validasi gate_id cocok dengan localStorage
-- [x] `/kiosk/[gate_id]/` — idle screen: clock, online indicator (Wifi/WifiOff), tombol sesuai gate_type
-- [x] `/kiosk/[gate_id]/entry` — pilih QR/RFID → input (RFID: hidden input HID emulation, QR: visible input) → POST /transactions/entry
-- [x] `/kiosk/[gate_id]/exit` — pilih QR/RFID → lookup by code → confirm screen (plat + durasi + estimasi tarif) → POST /transactions/:id/exit → redirect ke /payment
-- [x] `/kiosk/[gate_id]/payment` — pilih QRIS/Tunai; QRIS: poll payment status tiap 3 detik; Tunai: preset nominal + hitung kembalian → POST /payments/cash
-- [x] `/kiosk/[gate_id]/success` — countdown 7 detik lalu auto-redirect ke idle
+### Phase 4 — Kiosk Journey ✅ (migrated to apps/kiosk)
 
-> **Catatan kiosk:**
-> - Semua icon WAJIB lucide-svelte — tidak ada emoji di UI
-> - Idle timeout 60 detik di entry/exit, 120 detik di payment — auto-redirect ke idle
-> - RFID reader pakai HID keyboard emulation → hidden input yang auto-focus, submit on Enter
-> - Gate auth sementara via gate_token; akan migrasi ke QR pairing + SSE (listenPairing SSE endpoint sudah ada di backend)
-> - `getGateToken()` / `setGateToken()` / `getGateInfo()` / `setGateInfo()` / `clearGateSession()` ada di `$lib/utils/auth.ts`
-> - Payment API: `payCash(txId, tendered)`, `initiateQRIS(txId)`, `getPaymentsByTransaction(txId)` harus ada di `$lib/api/payments.ts`
+> Kiosk telah **dipindah ke `apps/kiosk`** — app SvelteKit terpisah dengan port 5174.
+> Route di `apps/web/src/routes/kiosk/` masih ada sebagai legacy tapi tidak aktif dipakai.
+
+- [x] `/setup` — auth via gate_token, simpan ke localStorage, redirect ke /gate/[gate_id]
+- [x] `/gate/[gate_id]/` — halaman utama gate: EntryGate atau ExitGate berdasarkan `gate_type`
+  - EntryGate: QR scan via kamera (jsQR worker) + RFID global keydown listener + tiket modal
+  - ExitGate: QR scan + RFID + payment modal (select/QRIS/cash) + camera debug preview
+- [x] Payment flow — inline modal di ExitGate (bukan redirect)
+  - Grace period (fee=0): langsung success, skip payment
+  - QRIS: `initiateQRIS` → tampilkan QR image → poll `/gate/payments/:id/poll` tiap 3s → auto-close saat `status === 'completed'`
+  - Tunai: tampilkan "silakan ke kasir" + countdown 60s
+  - QRIS expire countdown dari `qris_expires_at` → redirect ke select jika habis
+- [x] `/simulate` — dev panel: list transaksi open, pilih, set durasi backdate
+- [x] Camera debug preview — toggle button pojok kanan bawah ExitGate
+- [x] `apps/kiosk/vite.config.ts` — `allowedHosts: 'all'`, `host: true` untuk cloudflared tunnel
+- [x] `pnpm tunnel` script — `cloudflared tunnel --url http://localhost:5174`
+
+> **Konvensi kiosk (apps/kiosk):**
+> - **PaymentStatus**: `'completed'` bukan `'paid'` — sesuai Go API
+> - **RFID**: global `document.addEventListener('keydown')` — buffer karakter + flush on Enter
+> - **QRIS polling**: `/gate/payments/:id/poll` (bukan `/gate/payments/:id`) — pull Midtrans langsung
+> - **Tema PUTIH** — bg-white, border-gray-200. Bukan dark mode.
+> - Gate token helpers: `getGateToken()`, `setGateToken()`, `getGateInfo()`, `setGateInfo()`, `clearGateSession()`
+> - Idle reset: 60s → `window.location.reload()`
+> - RFID exit: fallback `awaiting_payment` jika kartu ditempel ulang setelah exit tercatat
+
+### apps/web kiosk legacy (deprecated)
+- Route `/kiosk/*` di `apps/web` masih ada tapi tidak dipakai — kiosk sudah pindah ke `apps/kiosk`
+- `+layout.ts` ditambah (`ssr = false`) di root dan `/kiosk` untuk mencegah SSR error
+- `client.ts` ditambah `kioskClient` — axios instance dengan gate token interceptor (tanpa redirect 401 ke /login)
 
 ### Phase 5 — Operator Journey
 - [ ] `/operator/transactions`

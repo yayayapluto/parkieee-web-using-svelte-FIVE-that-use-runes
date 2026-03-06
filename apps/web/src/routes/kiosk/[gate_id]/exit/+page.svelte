@@ -5,26 +5,28 @@
   import { getGateInfo } from '$lib/utils/auth'
   import { getTransactionByCode, recordExit } from '$lib/api/transactions'
   import { formatCurrency, formatDurationMinutes } from '$lib/utils/format'
-  import { ArrowLeft, CreditCard, ScanLine, Clock, Car, AlertCircle, CheckCircle } from 'lucide-svelte'
-  import PlateDisplay from '$lib/components/PlateDisplay.svelte'
+  import { AlertCircle, Loader } from 'lucide-svelte'
   import type { Transaction } from '$lib/types/domain'
 
   const gateId = $page.params.gate_id
   const gate   = getGateInfo()
 
-  type Method = 'rfid' | 'qr'
-  type Step   = 'select' | 'input' | 'loading-lookup' | 'confirm' | 'loading-exit' | 'error'
+  type Step = 'idle' | 'loading-lookup' | 'confirm' | 'loading-exit' | 'error'
 
-  let method   = $state<Method>('rfid')
-  let step     = $state<Step>('select')
+  let step     = $state<Step>('idle')
   let inputVal = $state('')
   let tx       = $state<Transaction | null>(null)
   let errorMsg = $state('')
   let inputEl  = $state<HTMLInputElement | null>(null)
 
-  $effect(() => {
-    if (step === 'input' && inputEl) inputEl.focus()
-  })
+  type StatusPhase = 'waiting' | 'validating' | 'open'
+  let statusPhase = $state<StatusPhase>('waiting')
+
+  const statusLabels: Record<StatusPhase, string> = {
+    waiting:    'Scan tiket atau tempel kartu',
+    validating: 'Proses validasi LPR, mohon tunggu...',
+    open:       'Silahkan masuk',
+  }
 
   let idleTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -33,240 +35,203 @@
     idleTimer = setTimeout(() => goto(`/kiosk/${gateId}`, { replaceState: true }), 60_000)
   }
 
-  onMount(() => resetIdleTimer())
+  onMount(() => {
+    resetIdleTimer()
+    inputEl?.focus()
+  })
+
   onDestroy(() => { if (idleTimer) clearTimeout(idleTimer) })
 
-  function selectMethod(m: Method) {
-    method = m
-    step = 'input'
-    resetIdleTimer()
-  }
+  $effect(() => {
+    if ((step === 'idle' || step === 'error') && inputEl) inputEl.focus()
+  })
 
   async function lookup() {
     const value = inputVal.trim()
-    if (!value) return
+    if (!value || step !== 'idle') return
 
     step = 'loading-lookup'
+    statusPhase = 'validating'
     resetIdleTimer()
 
     try {
-      const result = await getTransactionByCode(value)
-      tx = result
+      tx = await getTransactionByCode(value)
       step = 'confirm'
+      resetIdleTimer()
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : 'Transaksi tidak ditemukan.'
       step = 'error'
+      statusPhase = 'waiting'
+      resetIdleTimer()
     }
-    resetIdleTimer()
   }
 
   async function confirmExit() {
     if (!tx || !gate) return
 
     step = 'loading-exit'
+    statusPhase = 'validating'
     resetIdleTimer()
 
     try {
       const form = new FormData()
       form.append('exit_gate_id', gate.id)
-      form.append('exit_method', method)
-      if (method === 'rfid') form.append('rfid_card_uid', inputVal.trim())
-
+      form.append('exit_method', 'qr')
       const updated = await recordExit(tx.id, form)
-      goto(`/kiosk/${gateId}/payment?tx_id=${updated.id}`)
+      statusPhase = 'open'
+      await new Promise(r => setTimeout(r, 600))
+      goto(`/kiosk/${gateId}/payment?tx_id=${updated.id}`, { replaceState: true })
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : 'Gagal memproses keluar.'
       step = 'error'
+      statusPhase = 'waiting'
+      resetIdleTimer()
     }
-    resetIdleTimer()
   }
 
   function retry() {
-    inputVal = ''
-    tx = null
-    errorMsg = ''
-    step = 'select'
-    method = 'rfid'
+    inputVal    = ''
+    tx          = null
+    errorMsg    = ''
+    step        = 'idle'
+    statusPhase = 'waiting'
     resetIdleTimer()
   }
 
   const durationMinutes = $derived(
-    tx?.entry_at
-      ? Math.ceil((Date.now() - new Date(tx.entry_at).getTime()) / 60_000)
-      : 0
+    tx?.entry_at ? Math.ceil((Date.now() - new Date(tx.entry_at).getTime()) / 60_000) : 0
+  )
+
+  const entryPlate = $derived(
+    tx?.ocr?.find(o => o.photo_type === 'entry')?.actual_plate ?? null
   )
 </script>
 
-<svelte:window onkeydown={() => resetIdleTimer()} onmousemove={() => resetIdleTimer()} />
+<svelte:window onkeydown={() => resetIdleTimer()} />
 
-<div class="flex h-screen flex-col bg-slate-950 text-white select-none">
-  <div class="flex items-center gap-4 px-8 py-5 border-b border-slate-800">
-    <button
-      onclick={() => goto(`/kiosk/${gateId}`, { replaceState: true })}
-      class="text-slate-500 hover:text-slate-300 transition-colors"
-    >
-      <ArrowLeft size={20} />
-    </button>
+<div class="flex h-screen flex-col bg-white text-slate-900 select-none">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between border-b border-slate-200 px-8 py-3">
     <div>
-      <p class="text-xs text-slate-500 uppercase tracking-widest">Gerbang Keluar</p>
-      <p class="text-sm font-semibold text-slate-300">{gate?.name}</p>
+      <p class="text-xs text-slate-400 uppercase tracking-widest">{gate?.zone_name ?? '—'}</p>
+      <p class="text-sm font-semibold text-slate-700">{gate?.name ?? '—'}</p>
     </div>
+    <p class="font-mono text-xs text-slate-400">Gerbang Keluar</p>
   </div>
 
+  <!-- Main -->
   <div class="flex flex-1 flex-col items-center justify-center gap-8 px-8">
 
-    {#if step === 'select'}
-      <p class="text-xl font-light text-slate-300">Pilih metode keluar</p>
+    {#if step === 'idle' || step === 'error'}
 
-      <div class="flex gap-6">
-        <button
-          onclick={() => selectMethod('rfid')}
-          class="flex h-44 w-44 flex-col items-center justify-center gap-4 rounded-xl
-            border-2 border-slate-700 bg-slate-900 text-slate-300 transition-all
-            hover:border-brand-500 hover:bg-slate-800 hover:text-white active:scale-95"
-        >
-          <CreditCard size={48} strokeWidth={1.25} />
-          <span class="text-sm font-semibold">Tap RFID</span>
-        </button>
+      <p class="text-2xl font-light text-slate-700 text-center">
+        Silahkan cetak tiket atau tempelkan kartu
+      </p>
 
-        <button
-          onclick={() => selectMethod('qr')}
-          class="flex h-44 w-44 flex-col items-center justify-center gap-4 rounded-xl
-            border-2 border-slate-700 bg-slate-900 text-slate-300 transition-all
-            hover:border-brand-500 hover:bg-slate-800 hover:text-white active:scale-95"
-        >
-          <ScanLine size={48} strokeWidth={1.25} />
-          <span class="text-sm font-semibold">Scan QR / Kode</span>
-        </button>
-      </div>
-
-    {:else if step === 'input'}
-      {#if method === 'rfid'}
-        <CreditCard size={56} strokeWidth={1} class="text-slate-600 animate-pulse" />
-        <p class="text-xl font-light text-slate-300">Tempelkan kartu RFID</p>
-        <p class="text-xs text-slate-600 text-center max-w-xs">
-          Atau minta petugas untuk input kode tiket secara manual
-        </p>
+      <!-- Input visible — hasil RFID reader (HID keyboard) masuk sini -->
+      <div class="w-full max-w-lg">
         <input
           bind:this={inputEl}
           bind:value={inputVal}
-          onkeydown={(e) => { if (e.key === 'Enter') lookup() }}
-          class="absolute opacity-0 pointer-events-none"
+          onkeydown={(e) => { resetIdleTimer(); if (e.key === 'Enter') lookup() }}
+          placeholder="Scan tiket atau tempel kartu..."
+          class="w-full rounded border border-slate-300 bg-white px-5 py-3.5
+            font-mono text-base text-slate-700 outline-none text-center
+            placeholder:text-slate-300 focus:border-brand-400 focus:ring-1 focus:ring-brand-200"
           autocomplete="off"
         />
-        {#if inputVal}
-          <p class="font-mono text-xs text-slate-500">{inputVal}</p>
-          <button
-            onclick={lookup}
-            class="rounded-lg bg-brand-500 px-8 py-3 text-sm font-semibold
-              hover:bg-brand-600 active:scale-95 transition-colors"
-          >
-            Lanjutkan
-          </button>
-        {/if}
-      {:else}
-        <ScanLine size={56} strokeWidth={1} class="text-slate-600" />
-        <p class="text-xl font-light text-slate-300">Scan QR atau masukkan kode tiket</p>
-        <div class="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-4 py-3">
-          <ScanLine size={16} class="text-slate-500 shrink-0" />
-          <input
-            bind:this={inputEl}
-            bind:value={inputVal}
-            onkeydown={(e) => { if (e.key === 'Enter') lookup() }}
-            placeholder="Kode tiket..."
-            class="bg-transparent font-mono text-sm text-slate-300 outline-none
-              placeholder:text-slate-600 w-52"
-          />
+      </div>
+
+      {#if step === 'error'}
+        <div class="flex items-center gap-2 text-red-500">
+          <AlertCircle size={16} strokeWidth={1.5} />
+          <p class="text-sm">{errorMsg}</p>
         </div>
-        {#if inputVal.trim()}
-          <button
-            onclick={lookup}
-            class="rounded-lg bg-brand-500 px-8 py-3 text-sm font-semibold
-              hover:bg-brand-600 active:scale-95 transition-colors"
-          >
-            Cari Transaksi
-          </button>
-        {/if}
+        <button
+          onclick={retry}
+          class="rounded border border-slate-300 px-6 py-2 text-sm text-slate-600
+            hover:bg-slate-50 active:scale-95 transition-colors"
+        >
+          Coba Lagi
+        </button>
+      {:else if inputVal.trim()}
+        <button
+          onclick={lookup}
+          class="rounded bg-brand-500 px-10 py-3 text-sm font-semibold text-white
+            hover:bg-brand-600 active:scale-95 transition-colors"
+        >
+          Cari Transaksi
+        </button>
       {/if}
 
     {:else if step === 'loading-lookup' || step === 'loading-exit'}
-      <div class="h-12 w-12 animate-spin rounded-full border-4 border-slate-700 border-t-brand-500"></div>
-      <p class="text-sm text-slate-400">
-        {step === 'loading-lookup' ? 'Mencari transaksi...' : 'Memproses keluar...'}
-      </p>
+
+      <Loader size={36} strokeWidth={1.5} class="animate-spin text-brand-500" />
+      <p class="text-sm text-slate-500">{statusLabels.validating}</p>
 
     {:else if step === 'confirm' && tx}
-      <CheckCircle size={40} strokeWidth={1.5} class="text-emerald-400" />
-      <p class="text-xl font-light text-slate-300">Konfirmasi Keluar</p>
 
-      <div class="w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500 flex items-center gap-1.5">
-            <Car size={13} />
-            Plat Kendaraan
-          </span>
-          <PlateDisplay
-            plate={tx.ocr?.find(o => o.photo_type === 'entry')?.actual_plate ?? null}
-            size="md"
-          />
-        </div>
+      <!-- Confirm panel — split dua kolom sesuai wireframe gambar 3 -->
+      <div class="w-full max-w-2xl rounded border border-slate-200 shadow-sm overflow-hidden">
+        <div class="grid grid-cols-2 divide-x divide-slate-200">
 
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500 flex items-center gap-1.5">
-            <Clock size={13} />
-            Durasi Parkir
-          </span>
-          <span class="font-mono text-sm font-semibold text-white">
-            {formatDurationMinutes(durationMinutes)}
-          </span>
-        </div>
+          <!-- Kiri: durasi + tipe + total -->
+          <div class="flex flex-col justify-between p-8 gap-4 bg-white">
+            <div class="space-y-2">
+              <p class="font-mono text-2xl font-light text-slate-800">
+                {formatDurationMinutes(durationMinutes)}
+              </p>
+              <p class="text-sm text-slate-500">Hari Biasa</p>
+            </div>
+            <p class="font-mono text-3xl font-bold text-slate-900">
+              {tx.calculated_fee != null ? formatCurrency(tx.calculated_fee) : '—'}
+            </p>
+          </div>
 
-        <div class="flex items-center justify-between border-t border-slate-800 pt-4">
-          <span class="text-xs text-slate-500">Estimasi Tarif</span>
-          <span class="font-mono text-lg font-bold text-emerald-400">
-            {tx.calculated_fee != null ? formatCurrency(tx.calculated_fee) : '—'}
-          </span>
+          <!-- Kanan: plat + tagihan -->
+          <div class="flex flex-col divide-y divide-slate-200">
+            <div class="flex flex-col gap-1 p-6">
+              <p class="text-xs text-slate-400 uppercase tracking-wide">Nomor Polisi</p>
+              <p class="font-mono text-2xl font-bold text-slate-800 uppercase">
+                {entryPlate ?? '—'}
+              </p>
+            </div>
+            <div class="flex flex-col gap-1 p-6">
+              <p class="text-xs text-slate-400 uppercase tracking-wide">Bayar</p>
+              <p class="font-mono text-2xl font-bold text-emerald-600">
+                {tx.calculated_fee != null ? formatCurrency(tx.calculated_fee) : '—'}
+              </p>
+            </div>
+          </div>
+
         </div>
       </div>
 
       <div class="flex gap-4">
         <button
           onclick={retry}
-          class="rounded-lg border border-slate-700 px-6 py-2.5 text-sm text-slate-400
-            hover:bg-slate-800 active:scale-95 transition-colors"
+          class="rounded border border-slate-300 px-6 py-2.5 text-sm text-slate-600
+            hover:bg-slate-50 active:scale-95 transition-colors"
         >
           Batal
         </button>
         <button
           onclick={confirmExit}
-          class="rounded-lg bg-brand-500 px-8 py-2.5 text-sm font-semibold
+          class="rounded bg-brand-500 px-10 py-2.5 text-sm font-semibold text-white
             hover:bg-brand-600 active:scale-95 transition-colors"
         >
-          Proses Keluar
+          Lanjut Bayar
         </button>
       </div>
 
-    {:else if step === 'error'}
-      <AlertCircle size={48} strokeWidth={1.25} class="text-red-400" />
-      <p class="text-lg font-semibold text-red-400">Gagal</p>
-      <p class="text-sm text-slate-400 text-center max-w-xs">{errorMsg}</p>
-      <div class="flex gap-4">
-        <button
-          onclick={retry}
-          class="rounded-lg border border-slate-700 px-6 py-2.5 text-sm text-slate-300
-            hover:bg-slate-800 active:scale-95"
-        >
-          Coba Lagi
-        </button>
-        <button
-          onclick={() => goto(`/kiosk/${gateId}`, { replaceState: true })}
-          class="rounded-lg border border-slate-700 px-6 py-2.5 text-sm text-slate-300
-            hover:bg-slate-800 active:scale-95"
-        >
-          Kembali
-        </button>
-      </div>
     {/if}
 
   </div>
+
+  <!-- Status footer -->
+  <div class="border-t border-slate-200 bg-slate-50 px-8 py-3">
+    <p class="text-center text-xs text-slate-500">{statusLabels[statusPhase]}</p>
+  </div>
+
 </div>

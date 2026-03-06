@@ -1,0 +1,69 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@300;400;500;600;700;900&display=swap");
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.129 0.042 264.695);
+  --primary: oklch(0.208 0.042 265.755);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.704 0.04 256.788);
+}
+
+@theme {
+  --color-brand-50:  #f0f4ff;
+  --color-brand-100: #dce6ff;
+  --color-brand-500: #2c4a8f;
+  --color-brand-600: #1e3570;
+  --color-brand-700: #152660;
+  --color-brand-900: #0b1840;
+
+  --color-k-blue:    #1a56db;
+  --color-k-blue-bg: #eff6ff;
+  --color-k-green:   #15803d;
+  --color-k-green-bg:#dcfce7;
+  --color-k-green-border:#86efac;
+
+  --font-family-sans: "Inter", system-ui, sans-serif;
+  --font-family-kiosk: "Poppins", system-ui, sans-serif;
+  --font-family-mono: "JetBrains Mono", monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@theme {
+  --color-border: oklch(0.929 0.013 255.508);
+  --color-ring:   oklch(0.704 0.04 256.788);
+  --color-foreground: oklch(0.129 0.042 264.695);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-white text-foreground font-sans antialiased; }
+}
+
+@keyframes scanline {
+  0%   { top: 0%; }
+  50%  { top: calc(100% - 1px); }
+  100% { top: 0%; }
+}

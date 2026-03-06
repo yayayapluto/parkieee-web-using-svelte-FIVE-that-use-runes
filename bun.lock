@@ -14,6 +14,35 @@
         "typescript": "catalog:",
       },
     },
+    "apps/kiosk": {
+      "name": "kiosk",
+      "version": "0.0.1",
+      "dependencies": {
+        "@Svelte-Web/env": "workspace:*",
+        "axios": "^1.13.6",
+        "dotenv": "catalog:",
+        "lucide-svelte": "^0.576.0",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@Svelte-Web/config": "workspace:*",
+        "@internationalized/date": "^3.10.0",
+        "@sveltejs/adapter-auto": "^6.1.0",
+        "@sveltejs/kit": "^2.31.1",
+        "@sveltejs/vite-plugin-svelte": "^6.1.2",
+        "@tailwindcss/vite": "^4.1.12",
+        "bits-ui": "^2.14.4",
+        "clsx": "^2.1.1",
+        "svelte": "^5.38.1",
+        "svelte-check": "^4.3.1",
+        "tailwind-merge": "^3.4.0",
+        "tailwind-variants": "^3.2.2",
+        "tailwindcss": "^4.1.12",
+        "tw-animate-css": "^1.4.0",
+        "typescript": "catalog:",
+        "vite": "^7.1.2",
+      },
+    },
     "apps/web": {
       "name": "web",
       "version": "0.0.1",
@@ -336,6 +365,8 @@
     "is-reference": ["is-reference@3.0.3", "", { "dependencies": { "@types/estree": "^1.0.6" } }, "sha512-ixkJoqQvAP88E6wLydLGGqCJsrFUnqoH6HnaczB8XmDH1oaWU+xxdptvikTgaEhtZ53Ky6YXiBuUI2WXLMCwjw=="],
 
     "jiti": ["jiti@2.6.1", "", { "bin": { "jiti": "lib/jiti-cli.mjs" } }, "sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ=="],
+
+    "kiosk": ["kiosk@workspace:apps/kiosk"],
 
     "kleur": ["kleur@4.1.5", "", {}, "sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ=="],
 

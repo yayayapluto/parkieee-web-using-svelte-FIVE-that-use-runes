@@ -1,0 +1,22 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/gate/[gate_id]": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/gate/[gate_id]/payment": [
+		"src/routes/+layout.ts"
+	],
+	"/gate/[gate_id]/success": [
+		"src/routes/+layout.ts"
+	],
+	"/setup": [
+		"src/routes/+layout.ts"
+	],
+	"/simulate": [
+		"src/routes/+layout.ts"
+	]
+}
