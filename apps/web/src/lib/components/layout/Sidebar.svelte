@@ -5,7 +5,8 @@
   interface NavItem {
     href: string
     label: string
-    icon: Component
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    icon: Component<any>
   }
 
   const { navItems } = $props<{ navItems: NavItem[] }>()

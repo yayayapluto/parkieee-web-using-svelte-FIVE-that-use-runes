@@ -1,4 +1,10 @@
-const TOKEN_KEY = 'parkiye_token'
+// WARNING: Semua fungsi di file ini membaca/menulis localStorage — client-side only.
+// Decoded JWT payload (getRole, getUserID) TIDAK diverifikasi signature-nya.
+// Route guard yang bergantung pada getRole() adalah UI guard saja, bukan security boundary.
+// Security enforcement yang sesungguhnya ada di Go backend per-request.
+
+const TOKEN_KEY    = 'parkiye_token'
+const USER_NAME_KEY = 'parkiye_user_name'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
@@ -10,7 +16,7 @@ export function setToken(token: string): void {
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem('parkiye_user_name')
+  localStorage.removeItem(USER_NAME_KEY)
 }
 
 export function getRole(): string | null {
@@ -68,8 +74,6 @@ export function clearGateSession(): void {
   localStorage.removeItem(GATE_TOKEN_KEY)
   localStorage.removeItem(GATE_INFO_KEY)
 }
-
-const USER_NAME_KEY = 'parkiye_user_name'
 
 export function getUserName(): string | null {
   return localStorage.getItem(USER_NAME_KEY)

@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@Svelte-Web/env": "workspace:*",
+    "@parkieee/types": "workspace:*",
+    "@parkieee/utils": "workspace:*",
     "axios": "^1.13.6",
     "date-fns": "^4.1.0",
     "dotenv": "catalog:",

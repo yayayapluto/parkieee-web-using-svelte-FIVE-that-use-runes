@@ -19,6 +19,8 @@
       "version": "0.0.1",
       "dependencies": {
         "@Svelte-Web/env": "workspace:*",
+        "@parkieee/types": "workspace:*",
+        "@parkieee/utils": "workspace:*",
         "axios": "^1.13.6",
         "dotenv": "catalog:",
         "lucide-svelte": "^0.576.0",
@@ -48,6 +50,8 @@
       "version": "0.0.1",
       "dependencies": {
         "@Svelte-Web/env": "workspace:*",
+        "@parkieee/types": "workspace:*",
+        "@parkieee/utils": "workspace:*",
         "axios": "^1.13.6",
         "date-fns": "^4.1.0",
         "dotenv": "catalog:",
@@ -92,6 +96,14 @@
         "typescript": "catalog:",
         "vite": "^7.1.2",
       },
+    },
+    "packages/types": {
+      "name": "@parkieee/types",
+      "version": "0.0.1",
+    },
+    "packages/utils": {
+      "name": "@parkieee/utils",
+      "version": "0.0.1",
     },
   },
   "catalog": {
@@ -175,6 +187,10 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@lucide/svelte": ["@lucide/svelte@0.561.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-vofKV2UFVrKE6I4ewKJ3dfCXSV6iP6nWVmiM83MLjsU91EeJcEg7LoWUABLp/aOTxj1HQNbJD1f3g3L0JQgH9A=="],
+
+    "@parkieee/types": ["@parkieee/types@workspace:packages/types"],
+
+    "@parkieee/utils": ["@parkieee/utils@workspace:packages/utils"],
 
     "@polka/url": ["@polka/url@1.0.0-next.29", "", {}, "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="],
 

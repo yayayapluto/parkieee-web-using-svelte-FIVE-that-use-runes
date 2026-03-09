@@ -3,36 +3,10 @@
   import { page } from '$app/stores'
   import { getGateInfo } from '$lib/utils/auth'
   import { recordEntry, getTransactionByCode, getTransactionByRFID, recordExit } from '$lib/api/transactions'
-  import { initiateQRIS, payCash, pollPaymentStatus } from '$lib/api/payments'
+  import { initiateQRIS, pollPaymentStatus } from '$lib/api/payments'
   import { getKioskTariff } from '$lib/api/fees'
-  import { formatDurationMinutes } from '$lib/utils/format'
-  import { Loader2 } from 'lucide-svelte'
   import EntryGate from '$lib/components/EntryGate.svelte'
   import ExitGate  from '$lib/components/ExitGate.svelte'
-
-  // Modal state dikelola di sini, diturunkan ke EntryGate lewat props
-  let ticketCode   = $state('')
-  let ticketImg    = $state('')
-  let ticketPlate  = $state<string | null>(null)
-  let ticketMethod = $state<'qr' | 'rfid'>('qr')
-  let showModal    = $state(false)
-  let modalCountdown = $state(15)
-  let modalTimer: ReturnType<typeof setInterval> | null = null
-
-  function openTicketModal(code: string, img: string, plate: string | null, method: 'qr' | 'rfid') {
-    ticketCode = code; ticketImg = img; ticketPlate = plate; ticketMethod = method; showModal = true; modalCountdown = 15
-    if (modalTimer) clearInterval(modalTimer)
-    modalTimer = setInterval(() => {
-      modalCountdown -= 1
-      if (modalCountdown <= 0) closeTicketModal()
-    }, 1000)
-  }
-  function closeTicketModal() {
-    if (modalTimer) clearInterval(modalTimer)
-    showModal = false
-    resetIdleTimer()
-    setTimeout(() => { ticketCode = ''; ticketImg = ''; ticketPlate = null }, 5000)
-  }
   import type { VehicleTypeTariff } from '$lib/api/fees'
   import type { Transaction } from '$lib/types/domain'
 
@@ -48,19 +22,45 @@
   onMount(() => resetIdleTimer())
   onDestroy(() => { if (idleTimer) clearTimeout(idleTimer) })
 
-  // ── Entry state ────────────────────────────────────────────────────────────
+  // ── Entry state ──
+
   type EntryStep = 'idle' | 'loading' | 'error'
   let entryStep  = $state<EntryStep>('idle')
   let entryError = $state('')
   let rfidInput  = $state('')
   let tariffs    = $state<VehicleTypeTariff[]>([])
 
+  let showModal      = $state(false)
+  let ticketCode     = $state('')
+  let ticketImg      = $state('')
+  let ticketPlate    = $state<string | null>(null)
+  let ticketMethod   = $state<'qr' | 'rfid'>('qr')
+  let modalCountdown = $state(15)
+  let modalTimer: ReturnType<typeof setInterval> | null = null
+
+  function openTicketModal(code: string, img: string, plate: string | null, method: 'qr' | 'rfid') {
+    ticketCode = code; ticketImg = img; ticketPlate = plate; ticketMethod = method
+    showModal = true; modalCountdown = 15
+    if (modalTimer) clearInterval(modalTimer)
+    modalTimer = setInterval(() => {
+      modalCountdown -= 1
+      if (modalCountdown <= 0) closeTicketModal()
+    }, 1000)
+  }
+
+  function closeTicketModal() {
+    if (modalTimer) clearInterval(modalTimer)
+    showModal = false
+    resetIdleTimer()
+    setTimeout(() => { ticketCode = ''; ticketImg = ''; ticketPlate = null }, 5000)
+  }
+
   onMount(async () => {
     if (!isEntry) return
     try {
       const all = await getKioskTariff()
       tariffs = all.filter(t => t.fee_config !== null)
-    } catch {}
+    } catch { /* lanjut tanpa tarif */ }
   })
 
   async function doCetakTiket() {
@@ -90,11 +90,9 @@
       form.append('entry_method', 'rfid')
       form.append('rfid_card_uid', uid)
       const tx = await recordEntry(form)
-      rfidInput = ''
-      entryStep = 'idle'
-      ticketCode = tx.transaction_code
+      rfidInput = ''; entryStep = 'idle'
       ticketPlate = tx.ocr?.find(o => o.photo_type === 'entry')?.ocr_detected_plate ?? null
-      ticketMethod = 'rfid'
+      ticketMethod = 'rfid'; ticketCode = tx.transaction_code
       resetIdleTimer()
       setTimeout(() => { ticketCode = ''; ticketPlate = null }, 5000)
     } catch (err) {
@@ -108,23 +106,24 @@
     entryError = ''; rfidInput = ''; entryStep = 'idle'; resetIdleTimer()
   }
 
-  // ── Exit state ─────────────────────────────────────────────────────────────
-  type ExitStep = 'idle' | 'loading' | 'success' | 'error'
-  let exitStep      = $state<ExitStep>('idle')
-  let exitError     = $state('')
-  let exitRFID      = $state('')
-  let tx            = $state<Transaction | null>(null)
+  // ── Exit state ──
 
-  // Payment modal state
+  type ExitStep = 'idle' | 'loading' | 'success' | 'error'
+  let exitStep  = $state<ExitStep>('idle')
+  let exitError = $state('')
+  let exitRFID  = $state('')
+  let tx        = $state<Transaction | null>(null)
+
   type PayModal = 'none' | 'select' | 'qris' | 'cash'
-  let payModal      = $state<PayModal>('none')
-  let qrisPayment   = $state<import('$lib/types/domain.d').Payment | null>(null)
-  let qrisLoading   = $state(false)
-  let qrisError     = $state('')
-  let cashCountdown = $state(0)
-  let cashTimer:  ReturnType<typeof setInterval> | null = null
-  let qrisPollTimer: ReturnType<typeof setInterval> | null = null
-  let qrisExpireCountdown = $state(0)
+  let payModal             = $state<PayModal>('none')
+  let qrisPayment          = $state<import('$lib/types/domain').Payment | null>(null)
+  let qrisLoading          = $state(false)
+  let qrisError            = $state('')
+  let cashCountdown        = $state(0)
+  let qrisExpireCountdown  = $state(0)
+
+  let cashTimer:       ReturnType<typeof setInterval> | null = null
+  let qrisPollTimer:   ReturnType<typeof setInterval> | null = null
   let qrisExpireTimer: ReturnType<typeof setInterval> | null = null
 
   async function processExit(code: string, method: 'qr' | 'rfid') {
@@ -135,7 +134,6 @@
 
       if (method === 'rfid') {
         const found = await getTransactionByRFID(code)
-        // Kalau sudah awaiting_payment (tempel ulang), skip recordExit
         if (found.status === 'awaiting_payment') {
           updatedTx = found
         } else {
@@ -159,12 +157,10 @@
 
       tx = updatedTx
       if (!updatedTx.calculated_fee || updatedTx.calculated_fee === 0) {
-        exitStep = 'success'
-        resetIdleTimer()
+        exitStep = 'success'; resetIdleTimer()
         setTimeout(() => { exitStep = 'idle'; tx = null }, 5000)
       } else {
-        exitStep = 'idle'
-        payModal = 'select'
+        exitStep = 'idle'; payModal = 'select'
       }
     } catch (err) {
       exitError = err instanceof Error ? err.message : 'Gagal memproses keluar'
@@ -190,20 +186,28 @@
 
   function startQRISPolling() {
     if (qrisPollTimer) clearInterval(qrisPollTimer)
+    let consecutiveErrors = 0
     qrisPollTimer = setInterval(async () => {
       if (!qrisPayment) return
       try {
         const updated = await pollPaymentStatus(qrisPayment.id)
+        consecutiveErrors = 0
         qrisPayment = updated
         if (updated.status === 'completed') {
           stopQRISTimers()
-          payModal = 'none'
-          exitStep = 'success'
-          tx = null
+          payModal = 'none'; exitStep = 'success'; tx = null
           resetIdleTimer()
           setTimeout(() => { exitStep = 'idle' }, 5000)
         }
-      } catch { /* silent — tetap poll */ }
+      } catch {
+        consecutiveErrors += 1
+        // Setelah 5 kali gagal berturut-turut (~15 detik), tampilkan error ke user
+        if (consecutiveErrors >= 5) {
+          stopQRISTimers()
+          qrisError = 'Koneksi bermasalah. Silakan coba lagi atau hubungi petugas.'
+          payModal = 'select'
+        }
+      }
     }, 3000)
   }
 
@@ -215,7 +219,6 @@
       qrisExpireCountdown = secs
       if (secs <= 0) {
         stopQRISTimers()
-        // QRIS expired — balik ke pilih metode
         qrisPayment = null
         qrisError = 'QRIS expired, silakan coba lagi'
         payModal = 'select'
@@ -231,8 +234,7 @@
   }
 
   function doSelectCash() {
-    payModal = 'cash'
-    cashCountdown = 60
+    payModal = 'cash'; cashCountdown = 60
     if (cashTimer) clearInterval(cashTimer)
     cashTimer = setInterval(() => {
       cashCountdown -= 1
@@ -243,12 +245,9 @@
   function closePayModal() {
     if (cashTimer) clearInterval(cashTimer)
     stopQRISTimers()
-    payModal = 'none'
-    qrisPayment = null
-    qrisError = ''
-    // Transaksi sudah recorded exit, beri success tanpa bayar (kasir akan proses manual)
-    exitStep = 'success'
-    tx = null
+    payModal = 'none'; qrisPayment = null; qrisError = ''
+    // Transaksi exit sudah direcord — kasir proses manual, anggap sukses di sisi kiosk
+    exitStep = 'success'; tx = null
     resetIdleTimer()
     setTimeout(() => { exitStep = 'idle' }, 5000)
   }
@@ -271,7 +270,6 @@
 <svelte:window onkeydown={() => resetIdleTimer()} />
 
 {#if isEntry}
-
   <EntryGate
     {tariffs}
     bind:rfidInput
@@ -288,9 +286,7 @@
     onRetry={retryEntry}
     onCloseModal={closeTicketModal}
   />
-
 {:else}
-
   <ExitGate
     bind:rfidInput={exitRFID}
     bind:step={exitStep}
@@ -309,5 +305,4 @@
     onSelectCash={doSelectCash}
     onClosePayModal={closePayModal}
   />
-
 {/if}

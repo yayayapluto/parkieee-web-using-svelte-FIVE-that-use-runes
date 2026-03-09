@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte'
-  import type { Component } from 'svelte'
+  import type { Snippet, Component } from 'svelte'
   import Sidebar from './Sidebar.svelte'
   import TopBar from './TopBar.svelte'
 
-  interface NavItem {
+  export interface NavItem {
     href: string
     label: string
-    icon: Component
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    icon: Component<any>
   }
 
   const {

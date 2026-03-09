@@ -1,3 +1,7 @@
+// WARNING: ROUTE_ROLES dan hasRole() adalah UI guard untuk UX saja — bukan security.
+// Kalau token dimanipulasi di localStorage, guard ini bisa di-bypass.
+// Semua endpoint Go backend harus enforce role secara independen.
+
 export const ROUTE_ROLES: Record<string, string[]> = {
   '/operator':   ['operator', 'admin'],
   '/admin':      ['admin'],

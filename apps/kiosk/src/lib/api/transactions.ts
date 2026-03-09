@@ -1,20 +1,12 @@
 import { api } from './client'
-import { getGateToken } from '$lib/utils/auth'
 import type { ApiResponse } from '$lib/types/api'
 import type { Transaction } from '$lib/types/domain'
 
-// Inject Authorization manual untuk multipart — interceptor bisa ter-skip saat
-// per-request headers di-override. Jangan set Content-Type untuk FormData,
-// biarkan browser set boundary otomatis.
-function authHeader(): Record<string, string> {
-  const token = getGateToken()
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
+// Content-Type tidak di-set manual untuk FormData — biarkan browser set boundary otomatis.
+// Authorization header sudah di-inject oleh interceptor di client.ts.
 
 export async function recordEntry(form: FormData): Promise<Transaction> {
-  const res = await api.post<ApiResponse<Transaction>>('/api/v1/gate/transactions/entry', form, {
-    headers: { ...authHeader() },
-  })
+  const res = await api.post<ApiResponse<Transaction>>('/api/v1/gate/transactions/entry', form)
   return res.data.data
 }
 
@@ -34,8 +26,6 @@ export async function getTransactionByRFID(uid: string): Promise<Transaction> {
 }
 
 export async function recordExit(id: string, form: FormData): Promise<Transaction> {
-  const res = await api.post<ApiResponse<Transaction>>(`/api/v1/gate/transactions/${id}/exit`, form, {
-    headers: { ...authHeader() },
-  })
+  const res = await api.post<ApiResponse<Transaction>>(`/api/v1/gate/transactions/${id}/exit`, form)
   return res.data.data
 }

@@ -1,13 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { goto } from '$app/navigation'
   import { getGateInfo } from '$lib/utils/auth'
 
   onMount(() => {
     const gate = getGateInfo()
     if (gate) {
-      window.location.href = `/gate/${gate.id}`
+      goto(`/gate/${gate.id}`)
     } else {
-      window.location.href = '/setup'
+      goto('/setup')
     }
   })
 </script>

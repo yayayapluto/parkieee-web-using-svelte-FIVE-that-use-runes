@@ -1,42 +1,117 @@
-# Svelte-Web
+# Parkiye — Frontend Monorepo
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines SvelteKit, and more.
+Frontend monorepo untuk sistem manajemen parkir Parkiye.
+Dibangun dengan SvelteKit + Tailwind CSS v4 + shadcn-svelte, dikonsumsi dari Go REST API.
 
-## Features
+## Workspace
 
-- **TypeScript** - For type safety and improved developer experience
-- **SvelteKit** - Web framework for building Svelte apps
-- **TailwindCSS** - Utility-first CSS for rapid UI development
-- **shadcn/ui** - Reusable UI components
-- **Turborepo** - Optimized monorepo build system
+```
+apps/
+  web/      # Dashboard utama — operator / admin / monitoring / engineer (port 5173)
+  kiosk/    # Kiosk gate — entry & exit terminal (port 5174)
+packages/
+  config/   # Shared tsconfig
+  env/      # Shared env schema (@t3-oss/env-core + zod)
+```
 
-## Getting Started
+## Tech Stack
 
-First, install the dependencies:
+| | web | kiosk |
+|---|---|---|
+| Framework | SvelteKit | SvelteKit |
+| Language | TypeScript (strict) | TypeScript (strict) |
+| Svelte | v5 (runes) | v5 (runes) |
+| Styling | Tailwind CSS v4 | Tailwind CSS v4 |
+| UI Components | shadcn-svelte | bits-ui |
+| Icons | lucide-svelte | lucide-svelte |
+| HTTP | axios | axios |
+| Package Manager | bun | bun |
+
+## Quick Start
 
 ```bash
 bun install
+
+# Jalankan semua apps
+bun run dev
+
+# Jalankan per app
+bun run dev:web      # port 5173
+bun run dev:kiosk    # port 5174
 ```
 
-Then, run the development server:
+## Environment
+
+### apps/web
+
+```env
+# apps/web/.env
+PUBLIC_API_BASE_URL=http://localhost:8080
+PUBLIC_POLL_INTERVAL_FAST=5000
+PUBLIC_POLL_INTERVAL_NORMAL=10000
+PUBLIC_POLL_INTERVAL_SLOW=30000
+```
+
+### apps/kiosk
+
+```env
+# apps/kiosk/.env
+PUBLIC_API_BASE_URL=http://localhost:8080
+```
+
+## Auth
+
+- **web**: JWT user token — disimpan di localStorage, inject via axios interceptor
+- **kiosk**: Gate token — disimpan di localStorage via `getGateToken()`, client terpisah (`kioskClient`)
+
+## Kiosk
+
+App terpisah (`apps/kiosk`) yang berjalan di port 5174. Dirancang untuk display kiosk gate parkir.
+
+```
+/setup                  # Auth via gate_token
+/gate/[gate_id]/        # Halaman utama gate (EntryGate / ExitGate)
+/gate/[gate_id]/payment # Payment post-exit
+/gate/[gate_id]/success # Success screen
+/simulate               # Dev tool: backdate entry_at
+```
+
+### Fitur kiosk
+
+- QR scan via kamera (jsQR Web Worker, 250ms interval)
+- RFID via global `keydown` listener (HID emulation)
+- QRIS payment: poll `/gate/payments/:id/poll` tiap 3s (pull Midtrans langsung)
+- Tunai: tampilkan instruksi kasir + countdown
+- Camera debug preview: toggle overlay + scanline animation (pojok kanan bawah ExitGate)
+- Simulate panel: backdate `entry_at` untuk testing tarif
+
+### Tunnel (development)
 
 ```bash
-bun run dev
+# Backend
+cloudflared tunnel run parkir-api
+
+# Kiosk frontend — dari apps/kiosk atau root
+bun run --filter kiosk tunnel
+# atau: cloudflared tunnel --url http://localhost:5174
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser to see the web application.
+Vite config kiosk menggunakan `allowedHosts: 'all'` dan `host: true` — wajib untuk cloudflared.
 
-## Project Structure
+## Scripts
 
-```
-Svelte-Web/
-├── apps/
-│   ├── web/         # Frontend application (SvelteKit)
-```
+| Perintah | Deskripsi |
+|---|---|
+| `bun run dev` | Jalankan semua apps (turbo) |
+| `bun run dev:web` | Hanya web (port 5173) |
+| `bun run dev:kiosk` | Hanya kiosk (port 5174) |
+| `bun run build` | Build semua apps |
+| `bun run check-types` | TypeScript check semua apps |
 
-## Available Scripts
+## Konvensi
 
-- `bun run dev`: Start all applications in development mode
-- `bun run build`: Build all applications
-- `bun run dev:web`: Start only the web application
-- `bun run check-types`: Check TypeScript types across all apps
+- Svelte 5 runes wajib — tidak ada `export let`, `$:`, `<slot>`
+- Semua response API ikut shape `ApiResponse<T>` / `PaginatedResponse<T>`
+- `PaymentStatus`: `pending | completed | failed | expired | refunded` (bukan `paid`)
+- RFID: global `keydown` listener — tidak pakai hidden input
+- Kiosk idle reset: 60s → `window.location.reload()`
