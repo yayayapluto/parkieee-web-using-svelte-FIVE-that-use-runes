@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte'
   import type { Transaction } from '$lib/types/domain'
 
-  import { Loader2, QrCode, Banknote, CheckCircle2, Camera, CameraOff, Maximize2, Minimize2 } from 'lucide-svelte'
+  import { Loader2, QrCode, Banknote, CheckCircle2, Camera } from 'lucide-svelte'
   import KioskHeader     from '$lib/components/kiosk/KioskHeader.svelte'
   import KioskSubHeader  from '$lib/components/kiosk/KioskSubHeader.svelte'
   import KioskStatusBar  from '$lib/components/kiosk/KioskStatusBar.svelte'
@@ -34,6 +34,7 @@
     onSelectQRIS,
     onSelectCash,
     onClosePayModal,
+    onCancelPayModal,
   }: {
     rfidInput:       string
     step:            Step
@@ -51,6 +52,7 @@
     onSelectQRIS:    () => void
     onSelectCash:    () => void
     onClosePayModal: () => void
+    onCancelPayModal: () => void
   } = $props()
 
   // ── RFID global keyboard capture ─────────────────────────────────────────
@@ -96,9 +98,7 @@
   let canvasEl: HTMLCanvasElement
   let scanCooldown  = false
   let scanInterval: ReturnType<typeof setInterval> | null = null
-  let cameraError     = $state<string | null>(null)
   let showCamPreview  = $state(false)
-  let camPreviewLarge = $state(false)
   let worker:       Worker | null = null
 
   function buildWorkerBlob(): Worker {
@@ -214,77 +214,35 @@
     hasResult          ? 'TRANSAKSI SELESAI — SILAKAN KELUAR' :
                          'SCAN QR TIKET ATAU TEMPEL KARTU'
   )
-  const cameraStatus      = $derived(cameraError ? '● Kamera Error' : '● Kamera Standby')
-  const cameraStatusColor = $derived(cameraError ? '#ef4444' : '#16a34a')
+  const cameraStatus      = $derived('● Kamera Aktif')
+  const cameraStatusColor = $derived('#16a34a')
 </script>
 
 <!-- Video tersembunyi untuk QR scan — preview ditampilkan via objek yang sama -->
 <video bind:this={videoEl} playsinline muted class="fixed opacity-0 pointer-events-none w-px h-px top-0 left-0"></video>
 <canvas bind:this={canvasEl} class="fixed opacity-0 pointer-events-none w-px h-px top-0 left-0"></canvas>
 
-<!-- Debug: Camera Preview -->
+<!-- Camera Preview -->
 {#if showCamPreview}
-  <div
-    class="fixed z-50 shadow-2xl border-2 border-black/30 overflow-hidden bg-black
-      {camPreviewLarge
-        ? 'inset-4 rounded-xl'
-        : 'bottom-16 right-4 w-64 h-48 rounded-lg'}"
-  >
-    <!-- preview dari stream yang sama -->
+  <div class="fixed z-50 bottom-20 right-4 w-80 h-60 border border-gray-300 bg-black rounded shadow-lg overflow-hidden">
     <video
       srcObject={videoEl?.srcObject ?? null}
       autoplay
       playsinline
       muted
       class="w-full h-full object-cover"
+      style="transform: scaleX(-1)"
     ></video>
-
-    <!-- scan indicator: garis horizontal bergerak -->
-    <div class="absolute inset-0 pointer-events-none">
-      <div class="absolute left-0 right-0 h-px bg-green-400/70 shadow-[0_0_8px_2px_rgba(74,222,128,0.6)] animate-[scanline_2s_linear_infinite]"></div>
-    </div>
-
-    <!-- overlay info -->
-    <div class="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1 flex items-center justify-between">
-      <span class="text-[10px] text-green-400 font-mono tracking-wider">
-        {cameraError ? '✗ ERROR' : '● LIVE'}
-      </span>
-      <div class="flex items-center gap-1">
-        <button
-          onclick={() => camPreviewLarge = !camPreviewLarge}
-          class="text-white/70 hover:text-white cursor-pointer"
-        >
-          {#if camPreviewLarge}
-            <Minimize2 size={12} />
-          {:else}
-            <Maximize2 size={12} />
-          {/if}
-        </button>
-        <button
-          onclick={() => { showCamPreview = false; camPreviewLarge = false }}
-          class="text-white/70 hover:text-white cursor-pointer text-xs leading-none px-1"
-        >✕</button>
-      </div>
-    </div>
   </div>
 {/if}
 
-<!-- Tombol toggle preview -->
+<!-- Toggle camera preview -->
 <button
   onclick={() => showCamPreview = !showCamPreview}
-  title="{showCamPreview ? 'Tutup' : 'Buka'} preview kamera"
-  class="fixed z-50 bottom-8 right-4 w-9 h-9 flex items-center justify-center rounded-full shadow-lg cursor-pointer transition-colors
-    {cameraError
-      ? 'bg-red-600 hover:bg-red-700 text-white'
-      : showCamPreview
-        ? 'bg-gray-800 hover:bg-gray-900 text-green-400'
-        : 'bg-gray-800/80 hover:bg-gray-800 text-gray-400'}"
+  title="Toggle preview kamera"
+  class="fixed z-50 bottom-8 right-4 w-9 h-9 flex items-center justify-center rounded-full shadow-lg cursor-pointer bg-gray-800 hover:bg-gray-900 text-gray-400 transition-colors"
 >
-  {#if cameraError}
-    <CameraOff size={16} />
-  {:else}
-    <Camera size={16} />
-  {/if}
+  <Camera size={16} />
 </button>
 
 <!-- RFID dibaca via global keydown listener, tidak perlu hidden input -->
@@ -302,9 +260,9 @@
       {hasResult}
       {durationMinutes}
       {entryPlate}
-      {cameraError}
       {translateError}
       {formatDT}
+      showingPayModal={payModal !== 'none'}
     />
     <ExitVehiclePanel {tx} {hasResult} {entryPlate} />
   </div>
@@ -323,8 +281,8 @@
 <KioskModal
   show={payModal === 'select'}
   title="Pilih Metode Pembayaran"
-  onClose={onClosePayModal}
-  footerLabel="BATALKAN"
+  onClose={() => {}}
+  footerLabel=""
 >
   {#snippet children()}
     <div class="px-6 py-5 flex flex-col gap-4">
@@ -346,23 +304,23 @@
         <button
           onclick={onSelectQRIS}
           disabled={qrisLoading}
-          class="flex flex-col items-center justify-center gap-3 py-8 border-2 border-gray-200 hover:border-[#1a56db] hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          class="flex flex-col items-center justify-center gap-3 py-8 border-2 border-gray-200 hover:border-gray-900 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {#if qrisLoading}
-            <Loader2 size={48} class="animate-spin text-[#1a56db]" />
+            <Loader2 size={48} class="animate-spin text-gray-900" />
           {:else}
-            <QrCode size={48} class="text-[#1a56db]" strokeWidth={1.5} />
+            <QrCode size={48} class="text-gray-900" strokeWidth={1.5} />
           {/if}
-          <span class="text-sm font-bold tracking-[0.2em] uppercase text-gray-700">QRIS</span>
+          <span class="text-sm font-bold tracking-[0.2em] uppercase text-gray-900">QRIS</span>
         </button>
 
         <!-- Tunai -->
         <button
           onclick={onSelectCash}
-          class="flex flex-col items-center justify-center gap-3 py-8 border-2 border-gray-200 hover:border-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+          class="flex flex-col items-center justify-center gap-3 py-8 border-2 border-gray-200 hover:border-gray-900 hover:bg-gray-50 transition-colors cursor-pointer"
         >
-          <Banknote size={48} class="text-gray-700" strokeWidth={1.5} />
-          <span class="text-sm font-bold tracking-[0.2em] uppercase text-gray-700">TUNAI</span>
+          <Banknote size={48} class="text-gray-900" strokeWidth={1.5} />
+          <span class="text-sm font-bold tracking-[0.2em] uppercase text-gray-900">TUNAI</span>
         </button>
       </div>
     </div>
@@ -373,7 +331,7 @@
 <KioskModal
   show={payModal === 'qris'}
   title="Bayar dengan QRIS"
-  onClose={onClosePayModal}
+  onClose={onCancelPayModal}
   footerLabel={qrisExpireCountdown > 0 ? `Batalkan (${qrisExpireCountdown}d)` : 'Batalkan'}
 >
   {#snippet children()}
@@ -410,8 +368,8 @@
 <KioskModal
   show={payModal === 'cash'}
   title="Pembayaran Tunai"
-  onClose={onClosePayModal}
-  footerLabel="SELESAI"
+  onClose={() => {}}
+  footerLabel=""
 >
   {#snippet children()}
     <div class="px-6 py-8 flex flex-col items-center gap-5">
@@ -421,13 +379,10 @@
           <span class="text-2xl font-black text-gray-900">{formatCurrency(tx.calculated_fee ?? 0)}</span>
         </div>
       {/if}
-      <CheckCircle2 size={64} class="text-green-500" strokeWidth={1.5} />
+      <Loader2 size={64} class="animate-spin text-gray-400" strokeWidth={1.5} />
       <div class="text-center">
-        <p class="text-lg font-bold text-gray-800 tracking-[0.1em]">SILAKAN KE KASIR</p>
-        <p class="text-sm text-gray-400 mt-1">Petugas akan memproses pembayaran tunai Anda</p>
-      </div>
-      <div class="w-full bg-amber-50 border border-amber-200 px-4 py-3 text-center">
-        <span class="text-amber-700 text-xs tracking-[0.15em] uppercase">Menutup otomatis dalam {cashCountdown} detik</span>
+        <p class="text-lg font-bold text-gray-800 tracking-[0.1em]">MENUNGGU KONFIRMASI KASIR</p>
+        <p class="text-sm text-gray-400 mt-1">Petugas sedang memproses pembayaran tunai Anda</p>
       </div>
     </div>
   {/snippet}

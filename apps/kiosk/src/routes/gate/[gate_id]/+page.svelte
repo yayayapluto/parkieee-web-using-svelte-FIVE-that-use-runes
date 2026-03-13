@@ -252,6 +252,15 @@
     setTimeout(() => { exitStep = 'idle' }, 5000)
   }
 
+  function cancelPayModal() {
+    if (cashTimer) clearInterval(cashTimer)
+    stopQRISTimers()
+    payModal = 'none'; qrisPayment = null; qrisError = ''
+    // User membatalkan — kembali ke idle, bukan sukses
+    exitStep = 'idle'; tx = null
+    resetIdleTimer()
+  }
+
   function doExitScan(rawCode: string) {
     const code = rawCode.replace(/^PARKIEEE-/i, '')
     processExit(code, 'qr')
@@ -304,5 +313,6 @@
     onSelectQRIS={doStartQRIS}
     onSelectCash={doSelectCash}
     onClosePayModal={closePayModal}
+    onCancelPayModal={cancelPayModal}
   />
 {/if}

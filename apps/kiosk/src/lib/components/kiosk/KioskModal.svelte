@@ -36,14 +36,16 @@
       </div>
 
       <!-- Footer -->
-      <div class="border-t border-gray-200 px-5 py-3 flex justify-end shrink-0">
-        <button
-          onclick={onClose}
-          class="text-[11px] font-bold tracking-[0.2em] uppercase px-8 py-2.5 bg-gray-900 text-white cursor-pointer hover:bg-gray-800 transition-colors"
-        >
-          {footerLabel}
-        </button>
-      </div>
+      {#if footerLabel}
+        <div class="border-t border-gray-200 px-5 py-3 flex justify-end shrink-0">
+          <button
+            onclick={onClose}
+            class="text-[11px] font-bold tracking-[0.2em] uppercase px-8 py-2.5 bg-gray-900 text-white cursor-pointer hover:bg-gray-800 transition-colors"
+          >
+            {footerLabel}
+          </button>
+        </div>
+      {/if}
 
     </div>
   </div>

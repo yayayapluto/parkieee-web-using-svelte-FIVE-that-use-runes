@@ -27,14 +27,11 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/" | "/gate" | "/gate/[gate_id]" | "/gate/[gate_id]/payment" | "/gate/[gate_id]/success" | "/setup" | "/simulate" | "/[gate_id]" | "/[gate_id]/payment" | "/[gate_id]/success";
+		RouteId(): "/" | "/gate" | "/gate/[gate_id]" | "/gate/[gate_id]/payment" | "/gate/[gate_id]/success" | "/setup" | "/simulate";
 		RouteParams(): {
 			"/gate/[gate_id]": { gate_id: string };
 			"/gate/[gate_id]/payment": { gate_id: string };
-			"/gate/[gate_id]/success": { gate_id: string };
-			"/[gate_id]": { gate_id: string };
-			"/[gate_id]/payment": { gate_id: string };
-			"/[gate_id]/success": { gate_id: string }
+			"/gate/[gate_id]/success": { gate_id: string }
 		};
 		LayoutParams(): {
 			"/": { gate_id?: string };
@@ -43,10 +40,7 @@ declare module "$app/types" {
 			"/gate/[gate_id]/payment": { gate_id: string };
 			"/gate/[gate_id]/success": { gate_id: string };
 			"/setup": Record<string, never>;
-			"/simulate": Record<string, never>;
-			"/[gate_id]": { gate_id: string };
-			"/[gate_id]/payment": { gate_id: string };
-			"/[gate_id]/success": { gate_id: string }
+			"/simulate": Record<string, never>
 		};
 		Pathname(): "/" | `/gate/${string}` & {} | `/gate/${string}/payment` & {} | `/gate/${string}/success` & {} | "/setup" | "/simulate";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
