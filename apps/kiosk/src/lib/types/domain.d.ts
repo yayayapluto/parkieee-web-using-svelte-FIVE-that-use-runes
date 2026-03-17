@@ -1,5 +1,5 @@
 export type {
-  GateInfo, GateAuthResponse,
+  GateInfo, GateAuthResponse, PairingResponse,
   VehicleType,
   FeeTier, FeeConfig,
   OCRPhotoSummary, TransactionStatus, Transaction,

@@ -40,6 +40,17 @@ export async function getZoneCapacity(id: string): Promise<ZoneCapacity> {
   return res.data.data
 }
 
+export async function listGates(params?: {
+  zone_id?: string
+  gate_type?: 'entry' | 'exit'
+  active?: boolean
+  page?: number
+  page_size?: number
+}): Promise<PaginatedResponse<Gate>> {
+  const res = await apiClient.get('/api/v1/gates', { params })
+  return res.data
+}
+
 export async function getZoneGates(zoneId: string): Promise<Gate[]> {
   const res = await apiClient.get<ApiResponse<Gate[]>>(`/api/v1/zones/${zoneId}/gates`)
   return res.data.data
@@ -55,12 +66,12 @@ export async function createGate(body: {
   return res.data.data
 }
 
-export async function updateGate(id: string, body: {
+export async function updateGate(zoneId: string, gateId: string, body: {
   name?: string
   gate_type?: 'entry' | 'exit'
   location_desc?: string
   is_active?: boolean
 }): Promise<Gate> {
-  const res = await apiClient.put<ApiResponse<Gate>>(`/api/v1/zones/gates/${id}`, body)
+  const res = await apiClient.patch<ApiResponse<Gate>>(`/api/v1/zones/${zoneId}/gates/${gateId}`, body)
   return res.data.data
 }

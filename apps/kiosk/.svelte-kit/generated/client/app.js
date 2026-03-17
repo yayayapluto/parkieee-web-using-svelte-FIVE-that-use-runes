@@ -20,7 +20,7 @@ export const dictionary = {
 		"/gate/[gate_id]/payment": [5,[2]],
 		"/gate/[gate_id]/success": [6,[2]],
 		"/setup": [7],
-		"/simulate": [8]
+		"/sim": [8]
 	};
 
 export const hooks = {

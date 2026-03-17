@@ -1,5 +1,6 @@
 <script lang="ts">
-  import * as Dialog from '$lib/components/ui/dialog'
+  import * as AlertDialog from '$lib/components/ui/alert-dialog'
+  import { Button } from '$lib/components/ui/button'
 
   const {
     open = false,
@@ -22,36 +23,25 @@
     onConfirm: () => void
     onCancel: () => void
   }>()
-
-  const confirmClass = variant === 'danger'
-    ? 'bg-red-500 text-white hover:bg-red-600'
-    : 'bg-brand-500 text-white hover:bg-brand-600'
 </script>
 
-<Dialog.Root {open} onOpenChange={(o) => !o && onCancel()}>
-  <Dialog.Content class="max-w-sm">
-    <Dialog.Header>
-      <Dialog.Title class="text-sm font-semibold text-slate-900">{title}</Dialog.Title>
-      <Dialog.Description class="text-xs text-slate-500">{description}</Dialog.Description>
-    </Dialog.Header>
-
-    <Dialog.Footer class="mt-4 flex justify-end gap-2">
-      <button
-        onclick={onCancel}
-        disabled={loading}
-        class="rounded border border-surface-border px-4 py-1.5 text-xs text-slate-600
-          hover:bg-surface-muted disabled:opacity-50"
-      >
+<AlertDialog.Root {open} onOpenChange={(o) => !o && onCancel()}>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>{title}</AlertDialog.Title>
+      <AlertDialog.Description>{description}</AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Cancel onclick={onCancel} disabled={loading}>
         {cancelLabel}
-      </button>
-      <button
+      </AlertDialog.Cancel>
+      <AlertDialog.Action
         onclick={onConfirm}
         disabled={loading}
-        class="rounded px-4 py-1.5 text-xs font-medium transition-colors
-          disabled:cursor-not-allowed disabled:opacity-50 {confirmClass}"
+        class={variant === 'danger' ? '!bg-[#ef4444] !text-white hover:!bg-[#dc2626]' : '!bg-[#e11d48] !text-white hover:!bg-[#be123c]'}
       >
         {loading ? 'Memproses...' : confirmLabel}
-      </button>
-    </Dialog.Footer>
-  </Dialog.Content>
-</Dialog.Root>
+      </AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>

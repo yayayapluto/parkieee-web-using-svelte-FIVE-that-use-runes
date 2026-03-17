@@ -75,6 +75,17 @@ export function clearGateSession(): void {
   localStorage.removeItem(GATE_INFO_KEY)
 }
 
+export function can(permission: string): boolean {
+  const token = getToken()
+  if (!token) return false
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return (payload.permissions ?? []).includes(permission)
+  } catch {
+    return false
+  }
+}
+
 export function getUserName(): string | null {
   return localStorage.getItem(USER_NAME_KEY)
 }

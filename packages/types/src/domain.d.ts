@@ -54,6 +54,7 @@ export interface ZoneCapacity {
 export interface Gate {
   id: string
   zone_id: string
+  zone_name: string
   name: string
   gate_type: 'entry' | 'exit'
   location_desc: string

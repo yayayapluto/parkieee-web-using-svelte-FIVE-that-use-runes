@@ -360,14 +360,16 @@
           <span class="text-[10px] text-gray-300 tracking-wider">Menunggu konfirmasi pembayaran...</span>
         </div>
       </div>
+
     </div>
   {/snippet}
 </KioskModal>
 
-<!-- Modal: Tunai — operator yang proses -->
+<!-- Modal: Tunai — operator yang proses, dikunci sampai kasir konfirmasi -->
 <KioskModal
   show={payModal === 'cash'}
   title="Pembayaran Tunai"
+  lockClose
   onClose={() => {}}
   footerLabel=""
 >

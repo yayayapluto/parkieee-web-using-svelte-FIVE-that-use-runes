@@ -22,6 +22,11 @@ export async function getPayment(id: string): Promise<Payment> {
   return res.data.data
 }
 
+// simulatePay — sandbox only, kasir trigger Midtrans simulator
+export async function simulateQRIS(qrisImageURL: string): Promise<void> {
+  await apiClient.post('/api/v1/payments/sim-pay', { qris_image_url: qrisImageURL })
+}
+
 export async function requestRefund(body: {
   payment_id: string
   refund_amount: number

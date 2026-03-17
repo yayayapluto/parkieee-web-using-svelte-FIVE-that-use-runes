@@ -9,10 +9,10 @@
     const token = getToken()
     if (token) {
       const role = getRole()
-      const redirect = role ? (ROLE_REDIRECT[role] ?? '/login') : '/login'
+      const redirect = role ? (ROLE_REDIRECT[role] ?? '/masuk') : '/masuk'
       goto(redirect)
     } else {
-      goto('/login')
+      goto('/masuk')
     }
   })
 </script>

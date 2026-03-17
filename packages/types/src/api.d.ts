@@ -4,13 +4,27 @@ export interface ApiResponse<T> {
   data: T
 }
 
-export interface Pagination {
-  page: number
-  page_size: number
+export interface PaginationMeta {
+  current_page: number
+  per_page: number
   total: number
-  total_pages: number
-  prev: string | null
+  last_page: number
+  from: number
+  to: number
+  path: string
+}
+
+export interface PaginationLinks {
+  self: string
+  first: string
+  last: string
   next: string | null
+  prev: string | null
+}
+
+export interface Pagination {
+  meta: PaginationMeta
+  links: PaginationLinks
 }
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {

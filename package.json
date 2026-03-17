@@ -19,7 +19,8 @@
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
-    "dev:kiosk": "turbo -F kiosk dev"
+    "dev:kiosk": "turbo -F kiosk dev",
+    "tunnel:web": "bun run --filter web tunnel"
   },
   "dependencies": {
     "@Svelte-Web/env": "workspace:*",

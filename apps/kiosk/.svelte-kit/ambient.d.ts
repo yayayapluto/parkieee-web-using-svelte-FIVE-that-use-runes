@@ -105,6 +105,7 @@ declare module '$env/static/private' {
 declare module '$env/static/public' {
 	export const PUBLIC_API_BASE_URL: string;
 	export const PUBLIC_POLL_INTERVAL: string;
+	export const PUBLIC_MIDTRANS_SANDBOX: string;
 }
 
 /**
@@ -240,6 +241,7 @@ declare module '$env/dynamic/public' {
 	export const env: {
 		PUBLIC_API_BASE_URL: string;
 		PUBLIC_POLL_INTERVAL: string;
+		PUBLIC_MIDTRANS_SANDBOX: string;
 		[key: `PUBLIC_${string}`]: string | undefined;
 	}
 }

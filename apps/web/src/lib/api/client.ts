@@ -19,7 +19,7 @@ apiClient.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       clearToken()
-      goto('/login')
+      goto('/masuk')
     }
     const message = err.response?.data?.meta?.message ?? err.message
     return Promise.reject(new Error(message))

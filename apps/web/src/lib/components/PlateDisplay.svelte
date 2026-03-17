@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Badge } from '$lib/components/ui/badge'
   import { normalizePlate } from '$lib/utils/plate'
 
   const { plate, size = 'md', mismatch } = $props<{
@@ -8,22 +9,20 @@
   }>()
 
   const sizeClass = {
-    sm: 'px-2 py-0.5 text-xs',
-    md: 'px-3 py-1 text-sm',
-    lg: 'px-4 py-1.5 text-base',
+    sm: 'px-2 py-0.5 text-[11px]',
+    md: 'px-3 py-1 text-[13px]',
+    lg: 'px-4 py-1.5 text-[14px]',
   }
 </script>
 
 {#if plate}
-  <span
-    class="inline-flex items-center rounded border font-mono font-medium tracking-widest
-      {sizeClass[size]}
-      {mismatch
-        ? 'border-red-300 bg-red-50 text-red-700'
-        : 'border-slate-300 bg-slate-50 text-slate-900'}"
+  <Badge
+    class="font-mono font-medium tracking-widest {sizeClass[size]} {mismatch
+      ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-50'
+      : 'border-gray-200 bg-gray-50 text-gray-900 hover:bg-gray-50'}"
   >
     {normalizePlate(plate)}
-  </span>
+  </Badge>
 {:else}
-  <span class="font-mono text-xs text-slate-400">—</span>
+  <span class="font-mono text-[12px] text-gray-400">—</span>
 {/if}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy, $effect } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import * as echarts from 'echarts'
 
   const { option, height = '300px', loading = false } = $props<{

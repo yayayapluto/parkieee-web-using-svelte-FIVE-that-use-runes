@@ -16,7 +16,7 @@
 	"/setup": [
 		"src/routes/+layout.ts"
 	],
-	"/simulate": [
+	"/sim": [
 		"src/routes/+layout.ts"
 	]
 }

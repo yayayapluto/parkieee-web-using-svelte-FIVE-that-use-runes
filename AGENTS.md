@@ -73,12 +73,12 @@ routes/
 
 ### Kiosk — Konvensi Penting
 
-- **PaymentStatus** di kiosk: `'completed'` (bukan `'paid'`) — sesuai Go API `pkg/types/payment.go`
+- **PaymentStatus** di kiosk: Go API kini return `'paid'` sebagai status canonical. `'completed'` adalah alias lama — gunakan `'paid'` untuk kode baru
 - **RFID**: global `document.addEventListener('keydown')` — tidak pakai hidden input, karena focus bisa hilang
 - **QR Camera**: `jsQR` via Web Worker blob, scan setiap 250ms, cooldown 3s setelah berhasil scan
 - **QRIS polling**: `GET /gate/payments/:id/poll` tiap 3s — hit Midtrans API langsung (bukan cuma cek DB)
 - **Camera debug preview**: tombol kamera pojok kanan bawah ExitGate — toggle preview overlay + scanline animation
-- **Simulate page** (`/simulate`): dropdown transaksi open, set durasi backdate, pakai `PATCH /gate/transactions/:id/simulate`
+- **Sim page** (`/sim`): menggantikan `/simulate` — dropdown transaksi open, set durasi backdate, pakai `PATCH /gate/transactions/:id/simulate`
 - **Idle reset**: 60s di gate → `window.location.reload()`
 - RFID exit fallback: kalau transaksi `awaiting_payment` (kartu ditempel ulang), skip `recordExit`, langsung payment modal
 
@@ -173,57 +173,17 @@ Layout pakai `{@render children()}`, bukan `<slot>`:
 
 ## 6. Design System
 
-### 6.1 Filosofi Visual
+Lihat `style-admin-panel.md` untuk spesifikasi visual lengkap (font, warna, spacing, komponen).
 
-- **ERP Enterprise Light** — background putih/off-white, sidebar navy, tabel border tipis.
-- **Tabular & Dense** — prioritaskan informasi per pixel. Tidak ada whitespace kosong dramatis.
-- **Data First** — elemen dekoratif diminimalkan.
-- Border-radius maksimal `rounded` (4px). Tidak ada `rounded-2xl` atau shadow besar.
-  Exception: badge status boleh `rounded-full`.
+Ringkasan keputusan desain utama:
 
-> `app.css` saat ini masih dark mode bawaan Better T Stack — ganti ke enterprise light saat mulai implementasi layout.
-
-### 6.2 Color Token
-
-```
-Background utama      : #ffffff
-Background muted      : #f8f9fb
-Border tabel/divider  : #e2e6ed
-Sidebar               : #1e3570 (brand-600)
-Sidebar active item   : #2c4a8f (brand-500)
-Sidebar text          : #c8d6f0
-Primary action        : #2c4a8f
-Primary action hover  : #1e3570
-Text utama            : #0f172a (slate-900)
-Text sekunder         : #475569 (slate-500)
-```
-
-### 6.3 Status Badge Color
-
-| Status | Background | Text |
-|---|---|---|
-| Active / Open | `#dcfce7` | `#166534` |
-| Inactive / Closed | `#fee2e2` | `#991b1b` |
-| Pending / Warning | `#fef9c3` | `#854d0e` |
-| Info / Processing | `#dbeafe` | `#1e40af` |
-| Neutral / Draft | `#f1f5f9` | `#475569` |
-
-### 6.4 Typography
-
-- Font utama: **Inter** (Google Fonts)
-- Font mono: **JetBrains Mono** — untuk plat nomor, ID, log
-- Heading halaman: `text-sm font-semibold text-slate-900`
-- Label kolom tabel: `text-xs font-semibold uppercase tracking-wide text-slate-500`
-- Data sel: `text-sm text-slate-900`
-- Plate number / ID: `font-mono text-sm`
-
-### 6.5 Spacing & Sizing
-
-- Tinggi baris tabel: `h-10` (40px)
-- Padding sel: `px-3 py-2`
-- Sidebar width: `w-56` (224px)
-- Header bar height: `h-12`
-- Padding konten halaman: `px-6 py-4`
+- **Layout Vantus ERP style**: topbar (h-16) + sidebar (w-56) + main content
+- **Satu card putih** per halaman: berisi page title → filter → tabel → pagination
+- **Background body**: `#f4f4f5`, card punya `margin p-6` dari semua sisi
+- **Font**: DM Sans saja
+- **Primary accent**: `#e11d48` (rose-600)
+- **Spacing kelipatan 8** — 8/16/24/32px. Tidak ada nilai ganjil.
+- **User info ada di footer sidebar** — bukan di topbar. Topbar hanya logo + breadcrumb + notif.
 
 ---
 
@@ -232,7 +192,7 @@ Text sekunder         : #475569 (slate-500)
 ```
 src/
 ├── app.html
-├── app.css                    # @import tailwindcss + @theme tokens + Inter/JetBrains import
+├── app.css                    # @import tailwindcss + @theme tokens + DM Sans import
 ├── app.d.ts
 │
 ├── lib/
@@ -268,17 +228,18 @@ src/
 │       ├── format.ts          # currency, date, duration formatters
 │       ├── plate.ts           # normalisasi plat nomor
 │       ├── role.ts            # role check helpers + ROUTE_ROLES
-│       └── auth.ts            # localStorage token helpers
+│       └── auth.ts            # localStorage token helpers + getPermissions()
 │
 └── routes/
     ├── +layout.svelte         # root layout
-    ├── +layout.server.ts      # session check global
-    ├── login/
-    ├── kiosk/                 # no sidebar, fullscreen
-    ├── operator/
-    ├── admin/
-    ├── monitoring/
-    └── engineer/
+    ├── +layout.ts             # ssr = false
+    ├── +page.svelte           # redirect by role
+    ├── masuk/                 # halaman login
+    ├── (operator)/            # route group operator — guard ['operator','admin']
+    ├── (cashier)/             # route group kasir — guard can('cashier.ability')
+    ├── (admin)/               # route group admin — guard ['admin']
+    ├── (monitoring)/          # route group monitoring — guard ['owner','admin']
+    └── (engineer)/            # route group engineer — guard ['engineer','admin']
 ```
 
 ---
@@ -287,7 +248,7 @@ src/
 
 - Login via `POST /api/v1/auth/login` → terima `access_token`
 - Simpan `access_token` di **localStorage** (`key: "parkiye_token"`)
-- `$lib/utils/auth.ts` expose: `getToken()`, `setToken(t)`, `clearToken()`, `getRole()`
+- `$lib/utils/auth.ts` expose: `getToken()`, `setToken(t)`, `clearToken()`, `getRole()`, `getPermissions()`
 - Setiap request lewat axios interceptor yang auto-inject `Authorization: Bearer <token>`
 - Response `401` → axios interceptor clear token + `goto('/login')` otomatis
 
@@ -306,19 +267,18 @@ Tidak ada server-side guard. Dua lapis proteksi:
 2. Axios interceptor — kalau API return 401, auto clear token + redirect ke `/login`
 
 ```svelte
-<!-- contoh: apps/web/src/routes/operator/+layout.svelte -->
+<!-- contoh: apps/web/src/routes/(operator)/+layout.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte'
   import { goto } from '$app/navigation'
   import { getToken, getRole } from '$lib/utils/auth'
+  import { hasRole } from '$lib/utils/role'
 
   const { children } = $props()
 
   onMount(() => {
-    const token = getToken()
-    const role = getRole()
-    if (!token || !['operator', 'admin'].includes(role ?? '')) {
-      goto('/login')
+    if (!getToken() || !hasRole(['operator', 'admin'], getRole())) {
+      goto('/masuk')
     }
   })
 </script>
@@ -326,18 +286,28 @@ Tidak ada server-side guard. Dua lapis proteksi:
 {@render children()}
 ```
 
-### Role-based Access
+`(cashier)/+layout.svelte` menggunakan permission bukan role:
+```svelte
+onMount(() => {
+  if (!getToken() || !can('cashier.ability')) goto('/masuk')
+})
+```
+
+### Role-based Access (Route Level)
 
 Role didapat dari JWT payload yang di-decode client-side (tanpa verifikasi signature — verifikasi tetap di backend).
 
 ```ts
 // $lib/utils/role.ts
 export const ROUTE_ROLES: Record<string, string[]> = {
-  '/operator':   ['operator', 'admin'],
-  '/admin':      ['admin'],
-  '/monitoring': ['owner', 'admin'],
-  '/engineer':   ['engineer', 'admin'],
-  '/kiosk':      ['*'],
+  '/daftar-transaksi': ['operator', 'admin'],
+  '/atur-gerbang':     ['operator', 'admin'],
+  '/tindakan':         ['operator', 'admin'],
+  '/kasir':            ['cashier', 'admin'],
+  '/admin':            ['admin'],
+  '/monitoring':       ['owner', 'admin'],
+  '/engineer':         ['engineer', 'admin'],
+  '/kiosk':            ['*'],
 }
 
 export function hasRole(required: string[], userRole: string | null): boolean {
@@ -347,14 +317,84 @@ export function hasRole(required: string[], userRole: string | null): boolean {
 }
 ```
 
+### Permission-based Access (UI Element Level)
+
+**Semua kontrol visibilitas elemen UI (tombol, aksi, bulk bar) menggunakan permission, bukan role.**
+
+Ini konsisten dengan cara Go API backend enforce akses — middleware `RequirePermission("gate.override")`
+sudah permission-based, bukan role-based. Frontend mengikuti pola yang sama.
+
+**Mengapa permission, bukan role:**
+- Role bersifat label — permission adalah kemampuan nyata
+- Satu permission bisa dimiliki banyak role (`gate.override` dimiliki operator DAN admin)
+- Kalau pakai role: `if role === "operator" || role === "admin"` — rapuh, drift kalau matrix berubah
+- Kalau pakai permission: `if permissions.includes("gate.override")` — benar secara semantik, tidak perlu update frontend kalau matrix berubah di DB
+
+**Permission matrix (dari Go API seed):**
+```
+operator  → gate.override
+admin     → gate.override, fee.edit, report.view, user.manage, zone.manage, rfid.manage, config.edit
+owner     → report.view, fee.edit, zone.manage, config.edit
+engineer  → audit.read, config.edit
+```
+
+**JWT payload** berisi:
+```json
+{
+  "sub": "uuid",
+  "email": "user@example.com",
+  "role": "operator",
+  "permissions": ["gate.override"],
+  "exp": 1234567890
+}
+```
+
+**Helper di `$lib/utils/auth.ts`:**
+```ts
+// Decode JWT payload (tanpa verifikasi signature)
+export function getPermissions(): string[] {
+  const token = getToken()
+  if (!token) return []
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.permissions ?? []
+  } catch {
+    return []
+  }
+}
+
+export function can(node: string): boolean {
+  return getPermissions().includes(node)
+}
+```
+
+**Penggunaan di Svelte component:**
+```svelte
+<script lang="ts">
+  import { can } from '$lib/utils/auth'
+</script>
+
+{#if can('gate.override')}
+  <button>Override Fee</button>
+{/if}
+```
+
+**Role hanya dipakai untuk:**
+1. Route guard di `+layout.svelte` — cek apakah user boleh akses journey ini
+2. Label display di UI — "Logged in as: Operator"
+3. Sidebar nav items — show/hide menu berdasarkan role (bisa juga diganti permission kalau lebih granular)
+
+**Jangan** hide/show tombol atau aksi berdasarkan role — selalu gunakan permission.
+
 ### Redirect setelah login
 
 | Role | Redirect |
 |---|---|
-| operator | `/operator/transactions` |
+| operator | `/daftar-transaksi` |
 | admin | `/admin/users` |
 | owner | `/monitoring/dashboard` |
 | engineer | `/engineer/devices` |
+| cashier | `/kasir` |
 
 ---
 
@@ -557,7 +597,7 @@ import { PUBLIC_API_BASE_URL, PUBLIC_POLL_INTERVAL_FAST } from '$env/static/publ
 - [x] Install packages — `shadcn-svelte@1.1.1`, `echarts@6.0.0`, `lucide-svelte@0.576.0`, `date-fns@4.1.0`, `axios@1.13.6`
 - [x] `app.css` — shadcn slate base (oklch vars) + brand tokens `--color-brand-*` + Inter/JetBrains Mono via Google Fonts
 - [x] `packages/env/src/web.ts` — `PUBLIC_API_BASE_URL`, `PUBLIC_POLL_INTERVAL_FAST/NORMAL/SLOW`
-- [x] `$lib/utils/auth.ts` — `getToken`, `setToken`, `clearToken`, `getRole`, `getUserID` (decode JWT via `atob`, no library)
+- [x] `$lib/utils/auth.ts` — `getToken`, `setToken`, `clearToken`, `getRole`, `getUserID`, `getPermissions`, `can`
 - [x] `$lib/utils/format.ts` — `formatCurrency` (Intl.NumberFormat IDR), `formatDate`, `formatDateTime`, `formatTime`, `formatDurationMinutes`
 - [x] `$lib/utils/plate.ts` — `normalizePlate` (uppercase + strip whitespace)
 - [x] `$lib/utils/role.ts` — `ROUTE_ROLES`, `ROLE_REDIRECT`, `hasRole`
@@ -567,83 +607,52 @@ import { PUBLIC_API_BASE_URL, PUBLIC_POLL_INTERVAL_FAST } from '$env/static/publ
 - [x] `$lib/types/api.d.ts` — `ApiResponse<T>`, `PaginatedResponse<T>`, `Pagination`
 - [x] `$lib/types/domain.d.ts` — semua domain types dari Go API DTOs
 
-> **Catatan:** shadcn `init` overwrite `app.css` — brand tokens di-restore manual dan di-merge setelah block shadcn.
-> Google Fonts `@import url(...)` harus di baris pertama sebelum semua statement lain — PostCSS strict soal urutan `@import`.
-
 ### Phase 2 — Layout & Shell ✅
 - [x] Root `+layout.svelte` — import app.css, render children
 - [x] Root `+page.svelte` — redirect ke journey berdasarkan role (onMount)
 - [x] `AppShell.svelte` — sidebar + topbar + main content wrapper
-- [x] `Sidebar.svelte` — navy sidebar, nav items, active state via `$page.url.pathname`
-- [x] `TopBar.svelte` — nama user (localStorage) + role label + tombol Keluar
+- [x] `Sidebar.svelte` — sidebar putih, nav items, active state, user info di footer sidebar
+- [x] `TopBar.svelte` — logo kiri + breadcrumb tengah + notif kanan (user info dipindah ke sidebar)
 - [x] `KioskShell.svelte` — fullscreen dark wrapper tanpa sidebar
-- [x] `/login/+page.svelte` — form email/password, Zod validation, redirect by role
-- [x] `operator/+layout.svelte` — guard `['operator','admin']` + nav Transaksi/Gerbang/Override
-- [x] `admin/+layout.svelte` — guard `['admin']` + nav Pengguna/Zona/Gerbang/RFID/Tarif/Izin
-- [x] `monitoring/+layout.svelte` — guard `['owner','admin']` + nav Dashboard/Pendapatan/Okupansi/Audit
-- [x] `engineer/+layout.svelte` — guard `['engineer','admin']` + nav Perangkat/OCR/RFID/Log
-- [x] `kiosk/+layout.svelte` — KioskShell, no guard
-
-> **Catatan:** `getUserName()` disimpan ke localStorage saat login (bukan decode JWT) supaya TopBar tidak perlu fetch API. `clearToken()` juga clear user name sekaligus.
+- [x] `/masuk/+page.svelte` — form email/password, Zod validation, redirect by role
+- [x] `(operator)/+layout.svelte` — guard `['operator','admin']` + nav Transaksi/Gerbang/Tindakan
+- [x] `(cashier)/+layout.svelte` — guard `can('cashier.ability')`
+- [x] `(admin)/+layout.svelte` — guard `['admin']` + nav Pengguna/Zona/Gerbang/RFID/Tarif/Izin
+- [x] `(monitoring)/+layout.svelte` — guard `['owner','admin']` + nav Dashboard/Pendapatan/Okupansi/Audit
+- [x] `(engineer)/+layout.svelte` — guard `['engineer','admin']` + nav Perangkat/OCR/RFID/Log
 
 ### Phase 3 — Shared UI Components ✅
-- [x] `StatusBadge.svelte` — semua status dari Go API (transaction, payment, refund, OCR, device, gate)
-- [x] `PageHeader.svelte` — title + optional description + optional actions snippet
-- [x] `StatCard.svelte` — value + optional icon + optional trend (% hijau/merah) atau sub text
-- [x] `Pagination.svelte` — numbered pages dengan ellipsis, prev/next buttons
-- [x] `DataTable.svelte` — row selection, sortable columns, search inline, column visibility toggle, export CSV, loading skeleton, empty state, bulk select dengan checkbox (select all / indeterminate / per row), bulkActions snippet, highlight bg-blue-50 saat selected
-- [x] `FilterBar.svelte` — fields type text/select/date, reset button, optional actions snippet
-- [x] `ConfirmModal.svelte` — shadcn Dialog, variant default/danger, loading state
-- [x] `PlateDisplay.svelte` — font mono, auto-normalize, size sm/md/lg, mismatch highlight merah
-- [x] `charts/LineChart.svelte`, `charts/BarChart.svelte`, `charts/HeatmapChart.svelte` — echarts raw + ResizeObserver + loading state
-
-> **Keputusan desain yang sudah disepakati (dicatat di sini sebagai referensi Phase 4-5):**
->
-> **Operator Transactions** — tiga panel: form kiri (fixed width) + foto S3 tengah (entry & exit photo dari transaksi yang dipilih) + tabel full width bawah. Foto real-time tidak perlu — cukup dari S3.
->
-> **Gate per shift** — gate dipilih sekali saat start shift, disimpan di localStorage via `getActiveGate()` / `setActiveGate()` / `clearActiveGate()` di `$lib/utils/auth.ts`. `clearToken()` juga clear active gate. Kalau `getActiveGate()` null saat buka `/operator/transactions` → tampilkan prompt pilih gate dulu.
->
-> **Kiosk** — split panel dua kolom: kiri info durasi + kategori, kanan plat nomor + nominal bayar. Mengikuti referensi sistem parkir existing di lapangan.
->
-> **Pagination** — numbered pages dengan ellipsis, default page size 20 rows.
+- [x] `StatusBadge.svelte`
+- [x] `PageHeader.svelte`
+- [x] `StatCard.svelte`
+- [x] `Pagination.svelte`
+- [x] `DataTable.svelte`
+- [x] `FilterBar.svelte`
+- [x] `ConfirmModal.svelte`
+- [x] `PlateDisplay.svelte`
+- [x] `charts/LineChart.svelte`, `charts/BarChart.svelte`, `charts/HeatmapChart.svelte`
 
 ### Phase 4 — Kiosk Journey ✅ (migrated to apps/kiosk)
 
 > Kiosk telah **dipindah ke `apps/kiosk`** — app SvelteKit terpisah dengan port 5174.
-> Route di `apps/web/src/routes/kiosk/` masih ada sebagai legacy tapi tidak aktif dipakai.
 
-- [x] `/setup` — auth via gate_token, simpan ke localStorage, redirect ke /gate/[gate_id]
-- [x] `/gate/[gate_id]/` — halaman utama gate: EntryGate atau ExitGate berdasarkan `gate_type`
-  - EntryGate: QR scan via kamera (jsQR worker) + RFID global keydown listener + tiket modal
-  - ExitGate: QR scan + RFID + payment modal (select/QRIS/cash) + camera debug preview
-- [x] Payment flow — inline modal di ExitGate (bukan redirect)
-  - Grace period (fee=0): langsung success, skip payment
-  - QRIS: `initiateQRIS` → tampilkan QR image → poll `/gate/payments/:id/poll` tiap 3s → auto-close saat `status === 'completed'`
-  - Tunai: tampilkan "silakan ke kasir" + countdown 60s
-  - QRIS expire countdown dari `qris_expires_at` → redirect ke select jika habis
-- [x] `/simulate` — dev panel: list transaksi open, pilih, set durasi backdate
-- [x] Camera debug preview — toggle button pojok kanan bawah ExitGate
+- [x] `/setup`, `/gate/[gate_id]/`, payment flow, `/sim` (dev simulator, menggantikan `/simulate`), camera debug preview
 - [x] `apps/kiosk/vite.config.ts` — `allowedHosts: 'all'`, `host: true` untuk cloudflared tunnel
-- [x] `pnpm tunnel` script — `cloudflared tunnel --url http://localhost:5174`
+- [x] `pnpm tunnel` script
 
-> **Konvensi kiosk (apps/kiosk):**
-> - **PaymentStatus**: `'completed'` bukan `'paid'` — sesuai Go API
-> - **RFID**: global `document.addEventListener('keydown')` — buffer karakter + flush on Enter
-> - **QRIS polling**: `/gate/payments/:id/poll` (bukan `/gate/payments/:id`) — pull Midtrans langsung
-> - **Tema PUTIH** — bg-white, border-gray-200. Bukan dark mode.
-> - Gate token helpers: `getGateToken()`, `setGateToken()`, `getGateInfo()`, `setGateInfo()`, `clearGateSession()`
-> - Idle reset: 60s → `window.location.reload()`
-> - RFID exit: fallback `awaiting_payment` jika kartu ditempel ulang setelah exit tercatat
-
-### apps/web kiosk legacy (deprecated)
-- Route `/kiosk/*` di `apps/web` masih ada tapi tidak dipakai — kiosk sudah pindah ke `apps/kiosk`
-- `+layout.ts` ditambah (`ssr = false`) di root dan `/kiosk` untuk mencegah SSR error
-- `client.ts` ditambah `kioskClient` — axios instance dengan gate token interceptor (tanpa redirect 401 ke /login)
+### Phase 4.5 — Cashier Journey ✅
+- [x] `/kasir` — panel kasir: polling kiosk request, cash & QRIS payment, QRIS sandbox simulator, antrian manual
+- [x] `$lib/api/cashier.ts` — `listenCashierSSE` (polling 2s), `notifyCashierDone`, `notifyCashierCancel`
 
 ### Phase 5 — Operator Journey
-- [ ] `/operator/transactions`
-- [ ] `/operator/gates`
-- [ ] `/operator/overrides`
+- [x] `/daftar-transaksi` — tabel transaksi, filter (status/metode/date range), export CSV/XLSX/PDF, detail dialog + log, override dialog, cancel dialog
+- [ ] `/atur-gerbang`
+- [ ] `/tindakan`
+
+> **Catatan Phase 5:**
+> - Kontrol visibilitas tombol aksi (Cancel, Override Fee) → gunakan `can('gate.override')`, bukan cek role
+> - Nav sidebar → show/hide item berdasarkan role (operator tidak lihat menu admin)
+> - Satu halaman per route, elemen conditional berdasarkan permission dari JWT
 
 ### Phase 6 — Admin Journey
 - [ ] `/admin/users`
@@ -667,7 +676,69 @@ import { PUBLIC_API_BASE_URL, PUBLIC_POLL_INTERVAL_FAST } from '$env/static/publ
 
 ---
 
-## 16. Konvensi Kode
+## 16. Aturan Komponen UI — WAJIB DIIKUTI
+
+**SEMUA elemen UI di `apps/web` HARUS menggunakan shadcn-svelte component.** Tidak ada pengecualian.
+
+Jangan pernah pakai HTML native untuk UI elements yang sudah ada shadcn-nya:
+
+| ❌ Jangan | ✅ Pakai |
+|---|---|
+| `<button>` | `<Button>` dari `$lib/components/ui/button` |
+| `<input>` | `<Input>` dari `$lib/components/ui/input` |
+| `<select>` / `<NativeSelect>` | `* as Select` dari `$lib/components/ui/select` |
+| `<textarea>` | `<Textarea>` dari `$lib/components/ui/textarea` |
+| `<label>` | `<Label>` dari `$lib/components/ui/label` |
+| `<input type="checkbox">` | `<Checkbox>` dari `$lib/components/ui/checkbox` |
+| custom modal/dialog div | `* as AlertDialog` atau `* as Dialog` |
+| custom dropdown div | `* as DropdownMenu` dari `$lib/components/ui/dropdown-menu` |
+| custom table HTML | `* as Table` dari `$lib/components/ui/table` |
+| custom badge/pill span | `<Badge>` dari `$lib/components/ui/badge` |
+| custom card div | `* as Card` dari `$lib/components/ui/card` |
+| custom side panel | `* as Sheet` dari `$lib/components/ui/sheet` |
+| `<input type="date">` | `<Calendar>` + `* as Popover` + `@internationalized/date` |
+| custom breadcrumb | `* as Breadcrumb` dari `$lib/components/ui/breadcrumb` |
+| custom pagination | `* as Pagination` dari `$lib/components/ui/pagination` |
+| loading div/spinner | `<Skeleton>` dari `$lib/components/ui/skeleton` |
+| custom separator hr | `<Separator>` dari `$lib/components/ui/separator` |
+
+### shadcn components yang sudah terinstall di `apps/web`:
+```
+alert-dialog, badge, breadcrumb, button, calendar, card, checkbox,
+data-table (@tanstack/table-core), dialog, dropdown-menu, input, label,
+native-select, pagination, popover, select, separator, sheet, skeleton,
+table, textarea
+```
+
+### Import pattern:
+```ts
+import { Button } from '$lib/components/ui/button'
+import { Badge } from '$lib/components/ui/badge'
+import { Input } from '$lib/components/ui/input'
+import { Label } from '$lib/components/ui/label'
+import { Textarea } from '$lib/components/ui/textarea'
+import { Checkbox } from '$lib/components/ui/checkbox'
+import { Skeleton } from '$lib/components/ui/skeleton'
+import { Separator } from '$lib/components/ui/separator'
+import { Calendar } from '$lib/components/ui/calendar'
+import * as Select from '$lib/components/ui/select'
+import * as Dialog from '$lib/components/ui/dialog'
+import * as AlertDialog from '$lib/components/ui/alert-dialog'
+import * as Sheet from '$lib/components/ui/sheet'
+import * as Popover from '$lib/components/ui/popover'
+import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
+import * as Pagination from '$lib/components/ui/pagination'
+import * as Breadcrumb from '$lib/components/ui/breadcrumb'
+import * as Card from '$lib/components/ui/card'
+import * as Table from '$lib/components/ui/table'
+```
+
+### NativeSelect — kapan boleh dipakai:
+`NativeSelect` hanya boleh dipakai untuk filter bar sederhana di luar form. Untuk form/modal/sheet, selalu pakai `Select` dari shadcn.
+
+---
+
+## 17. Konvensi Kode
 
 - Svelte component: **PascalCase**, file `.svelte`
 - Semua utility/helper: **camelCase**, file `.ts`
@@ -681,7 +752,7 @@ import { PUBLIC_API_BASE_URL, PUBLIC_POLL_INTERVAL_FAST } from '$env/static/publ
 ## 17. Catatan Khusus
 
 - **Kiosk** deploy via Chromium `--kiosk` flag — pastikan tidak ada route yang bisa di-navigate tanpa sengaja.
-- **`gate.override` permission** — cek dari JWT payload untuk show/hide tombol override, validasi sesungguhnya tetap di backend.
+- **Permission vs Role untuk UI control** — selalu gunakan permission (`can('gate.override')`) untuk show/hide elemen UI. Role hanya untuk route guard dan label display.
 - **Audit log** di monitoring adalah read-only — tidak ada action apapun.
 - **Engineer log viewer** — polling GET dengan cursor/offset, tidak perlu WebSocket di MVP.
 - **shadcn-svelte components** di `$lib/components/ui/` di-generate via CLI — jangan diedit manual, kecuali memang perlu custom.

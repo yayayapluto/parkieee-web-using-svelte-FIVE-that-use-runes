@@ -1,56 +1,41 @@
 <script lang="ts">
-  const { page, totalPages, onPageChange } = $props<{
+  import * as Pagination from '$lib/components/ui/pagination'
+
+  const { page, totalPages, total, pageSize = 20, onPageChange } = $props<{
     page: number
     totalPages: number
+    total: number
+    pageSize?: number
     onPageChange: (page: number) => void
   }>()
-
-  function getPages(current: number, total: number): (number | '...')[] {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-
-    if (current <= 4) return [1, 2, 3, 4, 5, '...', total]
-    if (current >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total]
-
-    return [1, '...', current - 1, current, current + 1, '...', total]
-  }
-
-  const pages = $derived(getPages(page, totalPages))
 </script>
 
 {#if totalPages > 1}
-  <div class="flex items-center gap-1">
-    <button
-      onclick={() => onPageChange(page - 1)}
-      disabled={page === 1}
-      class="flex h-7 w-7 items-center justify-center rounded border border-surface-border text-xs text-slate-600
-        hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      ‹
-    </button>
-
-    {#each pages as p}
-      {#if p === '...'}
-        <span class="flex h-7 w-7 items-center justify-center text-xs text-slate-400">…</span>
-      {:else}
-        <button
-          onclick={() => onPageChange(p as number)}
-          class="flex h-7 w-7 items-center justify-center rounded border text-xs transition-colors
-            {page === p
-              ? 'border-brand-500 bg-brand-500 text-white'
-              : 'border-surface-border text-slate-600 hover:bg-surface-muted'}"
-        >
-          {p}
-        </button>
-      {/if}
-    {/each}
-
-    <button
-      onclick={() => onPageChange(page + 1)}
-      disabled={page === totalPages}
-      class="flex h-7 w-7 items-center justify-center rounded border border-surface-border text-xs text-slate-600
-        hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      ›
-    </button>
-  </div>
+  <Pagination.Root count={total} perPage={pageSize} page={page} onPageChange={onPageChange}>
+    {#snippet children({ pages, currentPage: cp })}
+      <Pagination.Content>
+        <Pagination.Item>
+          <Pagination.Previous class="h-8 text-[13px]" />
+        </Pagination.Item>
+        {#each pages as p (p.key)}
+          {#if p.type === 'ellipsis'}
+            <Pagination.Item><Pagination.Ellipsis /></Pagination.Item>
+          {:else}
+            <Pagination.Item>
+              <Pagination.Link
+                page={p}
+                isActive={cp === p.value}
+                class="h-8 w-8 text-[13px] {cp === p.value ? '!bg-[#e11d48] !text-white !border-[#e11d48]' : ''}"
+              >
+                {p.value}
+              </Pagination.Link>
+            </Pagination.Item>
+          {/if}
+        {/each}
+        <Pagination.Item>
+          <Pagination.Next class="h-8 text-[13px]" />
+        </Pagination.Item>
+      </Pagination.Content>
+    {/snippet}
+  </Pagination.Root>
 {/if}
