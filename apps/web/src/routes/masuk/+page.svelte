@@ -1,10 +1,8 @@
 <script lang="ts">
-  import {goto} from '$app/navigation'
+  import {goto, invalidateAll} from '$app/navigation'
   import {z} from 'zod'
   import {login} from '$lib/api/auth'
-  import {getRole, getToken} from '$lib/utils/auth'
   import {ROLE_REDIRECT} from '$lib/utils/role'
-  import {onMount} from 'svelte'
   import {Button} from '$lib/components/ui/button'
   import {Input} from '$lib/components/ui/input'
   import {Label} from '$lib/components/ui/label'
@@ -25,15 +23,11 @@
     password: z.string().min(8, 'Password minimal 8 karakter'),
   })
 
-  onMount(() => {
-    if (getToken()) {
-      const role = getRole()
-      goto(role ? (ROLE_REDIRECT[role] ?? '/') : '/')
-      return
-    }
+  // redirect jika sudah login ditangani +page.server.ts — tidak perlu onMount
+  $effect(() => {
     const saved = localStorage.getItem(REMEMBER_KEY)
     if (saved) {
-      values.email = saved
+      values.email = saved;
       rememberMe = true
     }
   })
@@ -51,16 +45,11 @@
       const data = await login(result.data.email, result.data.password)
       if (rememberMe) localStorage.setItem(REMEMBER_KEY, result.data.email)
       else localStorage.removeItem(REMEMBER_KEY)
-      await goto(ROLE_REDIRECT[data.user.role.name] ?? '/')
+      await invalidateAll()
+      await goto(ROLE_REDIRECT[data.user.role?.name ?? ''] ?? '/')
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
-      if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('401')) {
-        serverError = 'Email atau password salah.'
-      } else if (msg) {
-        serverError = msg
-      } else {
-        serverError = 'Tidak dapat terhubung ke server. Coba beberapa saat lagi.'
-      }
+      serverError = msg || 'Tidak dapat terhubung ke server. Coba beberapa saat lagi.'
       loading = false
     }
   }

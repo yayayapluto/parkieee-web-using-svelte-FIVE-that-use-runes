@@ -1,20 +1,29 @@
-import { apiClient } from './client'
-import { setToken, clearToken, setUserName } from '$lib/utils/auth'
-import { goto } from '$app/navigation'
-import type { ApiResponse, PaginatedResponse } from '$lib/types/api'
-import type { LoginResponse, User, Role, Permission } from '$lib/types/domain'
+import {apiClient} from './client'
+import {setUserName} from '$lib/utils/auth'
+import {goto} from '$app/navigation'
+import type {ApiResponse, PaginatedResponse} from '$lib/types/api'
+import type {Permission, Role, User} from '$lib/types/domain'
 
-export async function login(email: string, password: string): Promise<LoginResponse> {
-  const res = await apiClient.post<ApiResponse<LoginResponse>>('/api/v1/auth/login', { email, password })
-  const { token, user } = res.data.data
-  setToken(token)
-  setUserName(user.name)
-  return res.data.data
+export async function login(email: string, password: string): Promise<{ user: User }> {
+    const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email, password}),
+    })
+
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message ?? `Error ${res.status}`)
+    }
+
+    const data = await res.json()
+    if (data.user?.name) setUserName(data.user.name)
+    return data
 }
 
 export async function logout(): Promise<void> {
-  clearToken()
-  await goto('/login')
+    await fetch('/auth/logout', {method: 'POST'})
+    await goto('/masuk')
 }
 
 export async function getUsers(params?: { page?: number; page_size?: number }): Promise<PaginatedResponse<User>> {

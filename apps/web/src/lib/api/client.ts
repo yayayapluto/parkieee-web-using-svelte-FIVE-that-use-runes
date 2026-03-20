@@ -1,7 +1,9 @@
 import axios from 'axios'
-import { goto } from '$app/navigation'
-import { getToken, clearToken, getGateToken } from '$lib/utils/auth'
-import { PUBLIC_API_BASE_URL } from '$env/static/public'
+import {goto} from '$app/navigation'
+import {getGateToken} from '$lib/utils/auth'
+import {PUBLIC_API_BASE_URL} from '$env/static/public'
+import {get} from 'svelte/store'
+import {page} from '$app/stores'
 
 export const apiClient = axios.create({
   baseURL: PUBLIC_API_BASE_URL,
@@ -9,16 +11,16 @@ export const apiClient = axios.create({
 })
 
 apiClient.interceptors.request.use((config) => {
-  const token = getToken()
+    const token = get(page).data?.token
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
 apiClient.interceptors.response.use(
   (res) => res,
-  (err) => {
+    async (err) => {
     if (err.response?.status === 401) {
-      clearToken()
+        await fetch('/auth/logout', {method: 'POST'})
       goto('/masuk')
     }
     const message = err.response?.data?.meta?.message ?? err.message
@@ -26,7 +28,7 @@ apiClient.interceptors.response.use(
   }
 )
 
-// Client khusus kiosk — pakai gate token, 401 tidak redirect ke /login
+// Client khusus kiosk — pakai gate token dari localStorage
 export const kioskClient = axios.create({
   baseURL: PUBLIC_API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
